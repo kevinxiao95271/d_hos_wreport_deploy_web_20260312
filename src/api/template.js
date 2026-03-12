@@ -1,0 +1,13 @@
+import request from '@/utils/request'
+
+export const getTemplatePage  = params => request.get('/wr/template/page', { params })
+export const getTemplateList  = ()     => request.get('/wr/template/list')
+export const getTemplateDetail= id     => request.get(`/wr/template/detail/${id}`)
+export const getTemplateItems = id     => request.get(`/wr/template/items/${id}`)
+export const addTemplate      = data   => request.post('/wr/template/add', data)
+export const updateTemplate   = data   => request.post('/wr/template/update', data)
+export const deleteTemplate   = id     => request.post(`/wr/template/delete/${id}`)
+export const updateTemplateStatus = (id, status) => request.post(`/wr/template/status/${id}/${status}`)
+export const saveTemplateItems= (id, items) => request.post(`/wr/template/items/save/${id}`, items)
+export const uploadFormatFile = (itemId, formData) => request.post(`/wr/template/item/upload-format/${itemId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const deleteFormatFile = itemId => request.post(`/wr/template/item/delete-format/${itemId}`)
