@@ -6,7 +6,8 @@
           <tr>
             <th class="label-th" rowspan="1">项目</th>
             <th v-for="col in items" :key="col.id" class="col-th">
-              <div class="col-name" :title="col.itemName">{{ col.itemName }}</div>
+              <div v-if="editable" class="col-name" :title="col.itemName">{{ col.itemName }}</div>
+              <div v-else class="col-name-readonly">✓</div>
             </th>
           </tr>
         </thead>
@@ -174,6 +175,11 @@ function emitChange() {
   word-break: break-all;
   font-size: 11px;
   line-height: 1.4;
+}
+.col-name-readonly {
+  font-size: 14px;
+  color: #67c23a;
+  font-weight: 700;
 }
 .label-td {
   position: sticky;
