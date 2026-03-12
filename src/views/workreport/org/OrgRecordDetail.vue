@@ -22,15 +22,30 @@
         <el-descriptions :column="3" border>
           <el-descriptions-item label="提交时间">{{ record.submitTime || '未提交' }}</el-descriptions-item>
           <el-descriptions-item label="当前状态">
-            <el-tag :type="statusType(record.status)">{{ statusLabel(record.status) }}</el-tag>
+            <el-tag :type="statusType(record.status)">{{ record.statusLabel || statusLabel(record.status) }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item v-if="record.auditTime" label="审核时间">{{ record.auditTime }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
 
       <el-card shadow="never" style="margin-top:12px">
-        <template #header><span>填报数据</span></template>
-        <DynamicHeaderTable :items="templateItems" :values="recordValues" :editable="false" />
+        <template #header>
+          <span>填报数据</span>
+          <el-tag v-if="isMatrix" type="warning" size="small" style="margin-left:8px">勾选矩阵</el-tag>
+        </template>
+        <CheckboxMatrixTable
+          v-if="isMatrix"
+          :items="templateItems"
+          :rows="templateRows"
+          :values="recordValues"
+          :editable="false"
+        />
+        <DynamicHeaderTable
+          v-else
+          :items="templateItems"
+          :values="recordValues"
+          :editable="false"
+        />
       </el-card>
 
       <el-card v-if="attachments.length" shadow="never" style="margin-top:12px">
@@ -58,6 +73,7 @@ import { getRecordDetail } from '@/api/record'
 import { getTemplateItems } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
+import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -67,7 +83,12 @@ const loading       = ref(true)
 const record        = ref({})
 const recordValues  = ref([])
 const templateItems = ref([])
+const templateRows  = ref([])
 const attachments   = ref([])
+
+const isMatrix = computed(() =>
+  templateItems.value.some(i => i.valueType === 'checkbox')
+)
 
 const itemNameMap = computed(() => {
   const m = {}
@@ -82,6 +103,7 @@ onMounted(async () => {
     const detail = res.data
     record.value       = detail.record
     recordValues.value = detail.values || []
+    templateRows.value = detail.rows   || []
     const [itemsRes, attachRes] = await Promise.all([
       getTemplateItems(detail.record.templateId),
       getAttachments(recordId)
@@ -92,5 +114,5 @@ onMounted(async () => {
 })
 
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')
-const statusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }[s] ?? '')
+const statusType  = s => ({ 0: 'info',  1: 'warning', 2: 'success', 3: 'danger' }[s] ?? '')
 </script>

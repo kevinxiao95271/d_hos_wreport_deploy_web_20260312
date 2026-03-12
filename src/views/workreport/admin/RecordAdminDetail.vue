@@ -12,7 +12,7 @@
             <el-descriptions-item label="机构名称">{{ record.orgName || `ID:${record.orgId}` }}</el-descriptions-item>
             <el-descriptions-item label="提交时间">{{ record.submitTime || '未提交' }}</el-descriptions-item>
             <el-descriptions-item label="当前状态">
-              <el-tag :type="statusType(record.status)">{{ statusLabel(record.status) }}</el-tag>
+              <el-tag :type="statusType(record.status)">{{ record.statusLabel || statusLabel(record.status) }}</el-tag>
             </el-descriptions-item>
             <el-descriptions-item v-if="record.auditTime" label="审核时间">{{ record.auditTime }}</el-descriptions-item>
             <el-descriptions-item v-if="record.auditRemark" label="审核意见" :span="2">{{ record.auditRemark }}</el-descriptions-item>
@@ -20,10 +20,25 @@
           </el-descriptions>
         </el-card>
 
-        <!-- 数据表格 -->
+        <!-- 填报数据卡 -->
         <el-card shadow="never" style="margin-top:12px">
-          <template #header><span>填报数据</span></template>
-          <DynamicHeaderTable :items="templateItems" :values="recordValues" :editable="false" />
+          <template #header>
+            <span>填报数据</span>
+            <el-tag v-if="isMatrix" type="warning" size="small" style="margin-left:8px">勾选矩阵</el-tag>
+          </template>
+          <CheckboxMatrixTable
+            v-if="isMatrix"
+            :items="templateItems"
+            :rows="templateRows"
+            :values="recordValues"
+            :editable="false"
+          />
+          <DynamicHeaderTable
+            v-else
+            :items="templateItems"
+            :values="recordValues"
+            :editable="false"
+          />
         </el-card>
 
         <!-- 附件区 -->
@@ -81,19 +96,25 @@ import { getRecordDetail, auditRecord } from '@/api/record'
 import { getTemplateItems } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
+import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
 
 const route  = useRoute()
 const router = useRouter()
 const recordId = route.query.recordId
 
-const loading = ref(true)
+const loading  = ref(true)
 const auditing = ref(false)
-const record = ref({})
-const recordValues = ref([])
+const record   = ref({})
+const recordValues  = ref([])
 const templateItems = ref([])
-const attachments = ref([])
+const templateRows  = ref([])
+const attachments   = ref([])
 
 const auditForm = reactive({ auditResult: 1, auditRemark: '', resubmitDeadline: '' })
+
+const isMatrix = computed(() =>
+  templateItems.value.some(i => i.valueType === 'checkbox')
+)
 
 const itemNameMap = computed(() => {
   const m = {}
@@ -108,8 +129,9 @@ async function loadAll() {
   try {
     const res = await getRecordDetail(recordId)
     const detail = res.data
-    record.value  = detail.record
+    record.value       = detail.record
     recordValues.value = detail.values || []
+    templateRows.value = detail.rows   || []
 
     const [itemsRes, attachRes] = await Promise.all([
       getTemplateItems(detail.record.templateId),
@@ -124,9 +146,13 @@ async function doAudit(result) {
   if (result === 2) {
     if (!auditForm.auditRemark) { ElMessage.warning('驳回时请填写审核意见'); return }
     if (!auditForm.resubmitDeadline) { ElMessage.warning('驳回时请选择重新提交截止日期'); return }
-    await ElMessageBox.confirm('确认驳回该上报记录？', '确认驳回', { type: 'warning' })
+    try {
+      await ElMessageBox.confirm('确认驳回该上报记录？', '确认驳回', { type: 'warning' })
+    } catch { return }
   } else {
-    await ElMessageBox.confirm('确认审核通过？', '确认', { type: 'warning' })
+    try {
+      await ElMessageBox.confirm('确认审核通过？', '确认', { type: 'warning' })
+    } catch { return }
   }
   auditing.value = true
   try {
@@ -139,5 +165,5 @@ async function doAudit(result) {
 }
 
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')
-const statusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }[s] ?? '')
+const statusType  = s => ({ 0: 'info',  1: 'warning', 2: 'success', 3: 'danger' }[s] ?? '')
 </script>

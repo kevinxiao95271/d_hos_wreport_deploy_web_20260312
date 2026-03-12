@@ -22,14 +22,27 @@
       <template #header>
         <div class="card-header">
           <div>
+            <el-tag v-if="isMatrix" type="warning" style="margin-right:8px">勾选矩阵</el-tag>
+            <el-tag v-else type="primary" style="margin-right:8px">标准表头</el-tag>
             <span class="task-meta">截止日期：{{ taskDetail.deadline || '无限制' }}</span>
             <span v-if="taskDetail.remark" class="task-meta" style="margin-left:16px">备注：{{ taskDetail.remark }}</span>
           </div>
         </div>
       </template>
 
-      <!-- 填报表格 -->
+      <!-- 矩阵填报 -->
+      <CheckboxMatrixTable
+        v-if="isMatrix"
+        :items="templateItems"
+        :rows="templateRows"
+        :values="recordValues"
+        :editable="canEdit"
+        @update:rows="onRowsChange"
+      />
+
+      <!-- 标准多级表头填报 -->
       <DynamicHeaderTable
+        v-else
         ref="tableRef"
         :items="templateItems"
         :values="recordValues"
@@ -37,8 +50,8 @@
         @update:rows="onRowsChange"
       />
 
-      <!-- 附件上传区（按需要附件的节点分组） -->
-      <template v-if="canEdit">
+      <!-- 附件上传区（非矩阵模板才有节点级附件） -->
+      <template v-if="canEdit && !isMatrix">
         <div v-for="leaf in requireAttachLeaves" :key="leaf.id" style="margin-top:16px">
           <div class="attach-label">
             <span>{{ leaf.itemName }}</span>
@@ -62,10 +75,12 @@
             <el-button size="small" type="primary" plain>选择文件</el-button>
           </el-upload>
         </div>
+      </template>
 
-        <!-- 整体附件 -->
+      <!-- 整体附件 -->
+      <template v-if="canEdit">
         <div style="margin-top:16px">
-          <div class="attach-label"><span>整体附件（可选）</span></div>
+          <div class="attach-label"><span>附件（可选）</span></div>
           <el-upload
             v-if="recordId"
             multiple
@@ -75,6 +90,7 @@
           >
             <el-button size="small" plain>选择文件</el-button>
           </el-upload>
+          <el-text v-else type="info" size="small">保存草稿后可上传附件</el-text>
         </div>
       </template>
     </el-card>
@@ -86,7 +102,7 @@
     </div>
 
     <div v-else class="bottom-bar">
-      <el-tag type="info" size="large">{{ statusLabel(record?.status) }} — 只读模式</el-tag>
+      <el-tag type="info" size="large">{{ record?.statusLabel || statusLabel(record?.status) }} — 只读模式</el-tag>
       <el-button @click="router.back()">返回</el-button>
     </div>
   </div>
@@ -97,27 +113,33 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTaskDetail } from '@/api/task'
-import { getTemplateItems } from '@/api/template'
-import { getMyRecord, saveRecord, submitRecord } from '@/api/record'
+import { getTemplateFullDetail } from '@/api/template'
+import { getMyRecord, getRecordDetail, saveRecord, submitRecord } from '@/api/record'
 import { getAttachments, uploadAttachment, deleteAttachment } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
+import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
 
 const route  = useRoute()
 const router = useRouter()
 const taskId     = route.query.taskId
 const templateId = route.query.templateId
 
-const loading    = ref(true)
-const draftSaving= ref(false)
-const submitting = ref(false)
+const loading     = ref(true)
+const draftSaving = ref(false)
+const submitting  = ref(false)
 
-const taskDetail     = ref({})
-const templateItems  = ref([])
-const record         = ref(null)
-const recordId       = ref(null)
-const recordValues   = ref([])
-const currentRows    = ref([])
-const attachments    = ref([])
+const taskDetail    = ref({})
+const templateItems = ref([])
+const templateRows  = ref([])
+const record        = ref(null)
+const recordId      = ref(null)
+const recordValues  = ref([])
+const currentRows   = ref([])
+const attachments   = ref([])
+
+const isMatrix = computed(() =>
+  templateItems.value.some(i => i.valueType === 'checkbox')
+)
 
 const canEdit = computed(() => {
   const s = record.value?.status
@@ -130,7 +152,7 @@ const requireAttachLeaves = computed(() =>
 
 function attachFileList(itemId) {
   return attachments.value
-    .filter(a => itemId ? a.itemId === itemId : !a.itemId)
+    .filter(a => (itemId ? a.itemId === itemId : !a.itemId))
     .map(a => ({ name: a.attachName, url: a.attachPath, uid: a.id }))
 }
 
@@ -139,21 +161,21 @@ onMounted(loadAll)
 async function loadAll() {
   loading.value = true
   try {
-    const [taskRes, itemsRes] = await Promise.all([
+    const [taskRes, fullRes] = await Promise.all([
       getTaskDetail(taskId),
-      getTemplateItems(templateId)
+      getTemplateFullDetail(templateId)
     ])
     taskDetail.value    = taskRes.data
-    templateItems.value = itemsRes.data || []
+    templateItems.value = fullRes.data.items || []
+    templateRows.value  = fullRes.data.rows  || []
 
     try {
       const recRes = await getMyRecord(taskId)
       if (recRes.data) {
         record.value   = recRes.data
         recordId.value = recRes.data.id
-        // Load values and attachments
         const [detailRes, attachRes] = await Promise.all([
-          import('@/api/record').then(m => m.getRecordDetail(recRes.data.id)),
+          getRecordDetail(recRes.data.id),
           getAttachments(recRes.data.id)
         ])
         recordValues.value = detailRes.data.values || []
@@ -174,7 +196,6 @@ async function saveDraft() {
     if (!recordId.value && res.data) {
       recordId.value = res.data
       record.value = { status: 0 }
-      // reload attachments
       const attachRes = await getAttachments(recordId.value)
       attachments.value = attachRes.data || []
     }
@@ -183,18 +204,21 @@ async function saveDraft() {
 }
 
 async function handleSubmit() {
-  // Check required attachments
-  const missing = requireAttachLeaves.value.filter(l => {
-    if (l.requireAttachment !== 1) return false
-    return !attachments.value.some(a => a.itemId === l.id)
-  })
-  if (missing.length) {
-    ElMessage.warning(`请先上传必传附件：${missing.map(l => l.itemName).join('、')}`)
-    return
+  if (!isMatrix.value) {
+    const missing = requireAttachLeaves.value.filter(l => {
+      if (l.requireAttachment !== 1) return false
+      return !attachments.value.some(a => a.itemId === l.id)
+    })
+    if (missing.length) {
+      ElMessage.warning(`请先上传必传附件：${missing.map(l => l.itemName).join('、')}`)
+      return
+    }
   }
-  await ElMessageBox.confirm('确认提交？提交后将进入审核流程。', '确认提交', { type: 'warning' })
 
-  // Save first
+  try {
+    await ElMessageBox.confirm('确认提交？提交后将进入审核流程。', '确认提交', { type: 'warning' })
+  } catch { return }
+
   await saveDraft()
 
   submitting.value = true
@@ -207,7 +231,6 @@ async function handleSubmit() {
 
 async function uploadFile({ file }, itemId) {
   if (!recordId.value) {
-    // Auto-save draft first to get recordId
     await saveDraft()
   }
   try {
@@ -232,7 +255,14 @@ const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .task-meta { font-size: 13px; color: #666; }
-.attach-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+.attach-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
 .bottom-bar {
   position: sticky;
   bottom: 0;
