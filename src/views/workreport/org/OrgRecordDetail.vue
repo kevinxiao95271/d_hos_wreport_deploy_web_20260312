@@ -70,7 +70,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getRecordDetail } from '@/api/record'
-import { getTemplateItems } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
@@ -99,16 +98,15 @@ const itemNameMap = computed(() => {
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await getRecordDetail(recordId)
-    const detail = res.data
-    record.value       = detail.record
-    recordValues.value = detail.values || []
-    templateRows.value = detail.rows   || []
-    const [itemsRes, attachRes] = await Promise.all([
-      getTemplateItems(detail.record.templateId),
+    const [detailRes, attachRes] = await Promise.all([
+      getRecordDetail(recordId),
       getAttachments(recordId)
     ])
-    templateItems.value = itemsRes.data || []
+    const detail = detailRes.data
+    record.value        = detail.record
+    recordValues.value  = detail.values || []
+    templateRows.value  = detail.rows   || []
+    templateItems.value = detail.items  || []
     attachments.value   = attachRes.data || []
   } finally { loading.value = false }
 })
