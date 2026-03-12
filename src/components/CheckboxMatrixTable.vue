@@ -17,19 +17,23 @@
             :class="{
               'row-l1': row.rowLevel === 1,
               'row-l2': row.rowLevel === 2,
-              'row-l3': row.rowLevel === 3
+              'row-l3': row.rowLevel === 3,
+              'row-select-all': isSelectAllRow(row)
             }"
           >
             <td class="label-td">
               <span :style="{ paddingLeft: levelIndent[row.rowLevel] + 'px' }">
                 {{ row.rowLabel }}
+                <el-tooltip v-if="editable && isSelectAllRow(row)" content="勾选后该列所有行自动全选" placement="right">
+                  <el-icon style="vertical-align:middle;margin-left:4px;color:#e6a23c"><InfoFilled /></el-icon>
+                </el-tooltip>
               </span>
             </td>
             <td v-for="col in items" :key="col.id" class="cell-td">
               <el-checkbox
                 v-if="editable"
                 :model-value="getVal(col.id, row.rowIndex)"
-                @change="v => setVal(col.id, row.rowIndex, v)"
+                @change="v => setVal(col.id, row.rowIndex, v, row)"
               />
               <template v-else>
                 <el-icon v-if="getVal(col.id, row.rowIndex)" color="#67c23a" style="vertical-align:middle"><Select /></el-icon>
@@ -45,7 +49,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { Select } from '@element-plus/icons-vue'
+import { Select, InfoFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
   items:    { type: Array,   default: () => [] },
@@ -77,13 +81,30 @@ function getVal(itemId, rowIndex) {
   return !!valueMap.value[`${itemId}_${rowIndex}`]
 }
 
-function setVal(itemId, rowIndex, checked) {
+// "省市县全部成立" 行：勾选 → 整列全选，取消 → 整列清空
+function isSelectAllRow(row) {
+  return row.rowLevel === 1 && row.rowLabel?.includes('省市县全部成立')
+}
+
+function setVal(itemId, rowIndex, checked, row) {
   const key = `${itemId}_${rowIndex}`
   if (checked) {
     valueMap.value[key] = true
   } else {
     delete valueMap.value[key]
   }
+
+  if (row && isSelectAllRow(row)) {
+    props.rows.forEach(r => {
+      const k = `${itemId}_${r.rowIndex}`
+      if (checked) {
+        valueMap.value[k] = true
+      } else {
+        delete valueMap.value[k]
+      }
+    })
+  }
+
   emitChange()
 }
 
@@ -177,6 +198,12 @@ function emitChange() {
 .row-l3 > .label-td,
 .row-l3 > td {
   color: #555;
+}
+.row-select-all > .label-td,
+.row-select-all > td {
+  background: #fdf6ec !important;
+  border-top: 2px solid #e6a23c;
+  border-bottom: 2px solid #e6a23c;
 }
 .unchecked {
   color: #c0c4cc;
