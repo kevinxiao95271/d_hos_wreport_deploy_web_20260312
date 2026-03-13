@@ -64,7 +64,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMyRecordPage } from '@/api/record'
-import { getTaskPage } from '@/api/task'
+import { getActiveTasks } from '@/api/task'
 
 const router = useRouter()
 const loading = ref(false)
@@ -88,8 +88,8 @@ async function loadList(page) {
 }
 
 async function loadTaskMap() {
-  const res = await getTaskPage({ pageNo: 1, pageSize: 100 })
-  ;(res.data.records || []).forEach(t => { taskMap.value[t.id] = t.taskName })
+  const res = await getActiveTasks()
+  ;(res.data || []).forEach(t => { taskMap.value[t.id] = t.taskName })
 }
 
 function goForm(row) {
