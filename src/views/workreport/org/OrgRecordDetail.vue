@@ -70,6 +70,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getRecordDetail } from '@/api/record'
+import { getTemplateFullDetail } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
@@ -103,11 +104,16 @@ onMounted(async () => {
       getAttachments(recordId)
     ])
     const detail = detailRes.data
-    record.value        = detail.record
-    recordValues.value  = detail.values || []
-    templateRows.value  = detail.rows   || []
-    templateItems.value = detail.items  || []
-    attachments.value   = attachRes.data || []
+    record.value       = detail.record
+    recordValues.value = detail.values || []
+    templateRows.value = detail.rows   || []
+    attachments.value  = attachRes.data || []
+
+    const fullRes = await getTemplateFullDetail(detail.record.templateId)
+    templateItems.value = fullRes.data.items || []
+    if (!templateRows.value.length) {
+      templateRows.value = fullRes.data.rows || []
+    }
   } finally { loading.value = false }
 })
 
