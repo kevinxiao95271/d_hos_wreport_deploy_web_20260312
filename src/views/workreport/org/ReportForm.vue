@@ -54,7 +54,7 @@
       <template v-if="canEdit && !isMatrix">
         <div v-for="leaf in requireAttachLeaves" :key="leaf.id" style="margin-top:16px">
           <div class="attach-label">
-            <span>{{ leaf.itemName }}</span>
+            <span>{{ leafHeaderLabel(leaf) }}</span>
             <el-tag v-if="leaf.requireAttachment === 1" type="danger" size="small">必传</el-tag>
             <el-tag v-else type="info" size="small">可选</el-tag>
             <el-link
@@ -250,6 +250,13 @@ async function removeAttachment(file, itemId) {
 }
 
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')
+
+function leafHeaderLabel(leaf) {
+  const p = leaf.headerPath
+  if (!p) return leaf.itemName
+  if (Array.isArray(p)) return p.join(' / ')
+  return String(p)
+}
 </script>
 
 <style scoped>
