@@ -14,17 +14,20 @@
       <el-table-column
         v-for="leaf in leafNodes"
         :key="leaf.id"
-        :label="leaf.itemName"
+        :label="headerLabel(leaf)"
         :prop="leaf.id"
         min-width="120"
         align="center"
       >
         <template #header>
-          <div>
-            <span>{{ leaf.itemName }}</span>
-            <span v-if="leaf.unit" class="unit-label">（{{ leaf.unit }}）</span>
-            <span v-if="leaf.requireAttachment === 1" style="color:red"> *</span>
-          </div>
+          <el-tooltip :content="headerLabel(leaf)" placement="top" :disabled="!hasPath(leaf)">
+            <div>
+              <div class="col-full-path" v-if="hasPath(leaf)">{{ headerLabel(leaf) }}</div>
+              <div v-else>{{ leaf.itemName }}</div>
+              <span v-if="leaf.unit" class="unit-label">（{{ leaf.unit }}）</span>
+              <span v-if="leaf.requireAttachment === 1" style="color:red"> *</span>
+            </div>
+          </el-tooltip>
         </template>
         <template #default="{ row, $index }">
           <!-- 编辑模式 -->
@@ -162,10 +165,32 @@ function parseOptions(placeholder) {
   if (!placeholder) return []
   return placeholder.split(',').map(s => s.trim()).filter(Boolean)
 }
+
+// headerPath 可能是数组或字符串，统一转为 "A / B / C" 格式
+function headerLabel(leaf) {
+  const p = leaf.headerPath
+  if (!p) return leaf.itemName
+  if (Array.isArray(p)) return p.join(' / ')
+  return String(p)
+}
+
+// 是否有多级路径（超过1段才显示路径）
+function hasPath(leaf) {
+  const p = leaf.headerPath
+  if (!p) return false
+  return Array.isArray(p) ? p.length > 1 : false
+}
 </script>
 
 <style scoped>
 .dht-wrapper { width: 100%; }
 .unit-label { font-size: 11px; color: #999; }
 .add-row-btn { margin-top: 8px; }
+.col-full-path {
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-all;
+  color: #303133;
+}
 </style>
