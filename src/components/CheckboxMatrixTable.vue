@@ -49,7 +49,7 @@
               <el-checkbox
                 v-if="editable"
                 :model-value="getVal(col.id, row.rowIndex)"
-                @change="v => setVal(col.id, row.rowIndex, v, row)"
+                @change="v => setVal(col.id, row.rowIndex, v)"
               />
               <template v-else>
                 <el-icon v-if="getVal(col.id, row.rowIndex)" color="#67c23a" style="vertical-align:middle"><Select /></el-icon>
@@ -86,26 +86,22 @@ const numberItems = computed(() =>
   props.items.filter(i => i.valueType !== 'checkbox').sort((a, b) => (a.sortNum || 0) - (b.sortNum || 0))
 )
 
-// ── 行父子关系（Level 2 ↔ Level 3，仅基于 parentRowIndex） ──
-const childrenOf = computed(() => {
-  const map = {}
-  props.rows.forEach(r => {
-    if (r.rowLevel === 3 && r.parentRowIndex != null) {
-      if (!map[r.parentRowIndex]) map[r.parentRowIndex] = []
-      map[r.parentRowIndex].push(r.rowIndex)
-    }
-  })
-  return map
+// ── 行树结构（通用，基于 parentRowIndex，不限层级） ──────────
+const rowMap = computed(() => {
+  const m = {}
+  props.rows.forEach(r => { m[r.rowIndex] = r })
+  return m
 })
 
-const parentOf = computed(() => {
-  const map = {}
+const childrenOf = computed(() => {
+  const m = {}
   props.rows.forEach(r => {
-    if (r.rowLevel === 3 && r.parentRowIndex != null) {
-      map[r.rowIndex] = r.parentRowIndex
+    if (r.parentRowIndex != null) {
+      if (!m[r.parentRowIndex]) m[r.parentRowIndex] = []
+      m[r.parentRowIndex].push(r.rowIndex)
     }
   })
-  return map
+  return m
 })
 
 // ── 状态 ─────────────────────────────────────────────────
@@ -138,33 +134,32 @@ function getVal(itemId, rowIndex) {
   return !!valueMap.value[`${itemId}_${rowIndex}`]
 }
 
-// ── 写值（含级联） ─────────────────────────────────────────
-function setVal(itemId, rowIndex, checked, row) {
+// ── 写值（含递归级联） ────────────────────────────────────────
+function setVal(itemId, rowIndex, checked) {
   _set(itemId, rowIndex, checked)
-
-  if (row.rowLevel === 2) {
-    // 勾选/取消 市 → 其下所有 县区 同步
-    const children = childrenOf.value[rowIndex] || []
-    children.forEach(ci => _set(itemId, ci, checked))
-
-  } else if (row.rowLevel === 3) {
-    const parentRowIndex = parentOf.value[rowIndex]
-    if (parentRowIndex != null) {
-      const siblings = childrenOf.value[parentRowIndex] || []
-      if (checked) {
-        // 所有县区都勾选 → 市自动勾选
-        const allChecked = siblings.every(
-          si => si === rowIndex || !!valueMap.value[`${itemId}_${si}`]
-        )
-        if (allChecked) _set(itemId, parentRowIndex, true)
-      } else {
-        // 任一县区取消 → 市取消
-        _set(itemId, parentRowIndex, false)
-      }
-    }
-  }
-
+  cascadeDown(itemId, rowIndex, checked)
+  bubbleUp(itemId, rowIndex)
   emitChange()
+}
+
+// 向下传播：勾选/取消父节点时，递归同步所有子孙
+function cascadeDown(itemId, rowIndex, checked) {
+  const children = childrenOf.value[rowIndex] || []
+  children.forEach(ci => {
+    _set(itemId, ci, checked)
+    cascadeDown(itemId, ci, checked)
+  })
+}
+
+// 向上传播：子节点变更后，检查父节点是否应自动勾选/取消
+function bubbleUp(itemId, rowIndex) {
+  const row = rowMap.value[rowIndex]
+  if (!row || row.parentRowIndex == null) return
+  const parentRowIndex = row.parentRowIndex
+  const siblings = childrenOf.value[parentRowIndex] || []
+  const allChecked = siblings.every(si => !!valueMap.value[`${itemId}_${si}`])
+  _set(itemId, parentRowIndex, allChecked)
+  bubbleUp(itemId, parentRowIndex)
 }
 
 function _set(itemId, rowIndex, checked) {
