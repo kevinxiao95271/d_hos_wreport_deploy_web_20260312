@@ -31,32 +31,42 @@
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="row in rows"
-            :key="row.rowIndex"
-            :class="{
-              'row-l1': row.rowLevel === 1,
-              'row-l2': row.rowLevel === 2,
-              'row-l3': row.rowLevel === 3
-            }"
-          >
-            <td class="label-td">
-              <span :style="{ paddingLeft: levelIndent[row.rowLevel] + 'px' }">
-                {{ row.rowLabel }}
-              </span>
-            </td>
-            <td v-for="col in checkboxItems" :key="col.id" class="cell-td">
-              <el-checkbox
-                v-if="editable"
-                :model-value="getVal(col.id, row.rowIndex)"
-                @change="v => setVal(col.id, row.rowIndex, v)"
-              />
-              <template v-else>
-                <el-icon v-if="getVal(col.id, row.rowIndex)" color="#67c23a" style="vertical-align:middle"><Select /></el-icon>
-                <span v-else class="unchecked">—</span>
-              </template>
-            </td>
+          <!-- 树B：市级（先渲染） -->
+          <template v-for="row in groupB" :key="row.rowIndex">
+            <tr :class="rowClass(row)">
+              <td class="label-td">
+                <span :style="{ paddingLeft: levelIndent[row.rowLevel] + 'px' }">{{ row.rowLabel }}</span>
+              </td>
+              <td v-for="col in checkboxItems" :key="col.id" class="cell-td">
+                <el-checkbox v-if="editable" :model-value="getVal(col.id, row.rowIndex)" @change="v => setVal(col.id, row.rowIndex, v)" />
+                <template v-else>
+                  <el-icon v-if="getVal(col.id, row.rowIndex)" color="#67c23a" style="vertical-align:middle"><Select /></el-icon>
+                  <span v-else class="unchecked">—</span>
+                </template>
+              </td>
+            </tr>
+          </template>
+
+          <!-- 分隔行 -->
+          <tr v-if="groupB.length && groupA.length" class="group-separator">
+            <td :colspan="checkboxItems.length + 1"></td>
           </tr>
+
+          <!-- 树A：省市县（后渲染） -->
+          <template v-for="row in groupA" :key="row.rowIndex">
+            <tr :class="rowClass(row)">
+              <td class="label-td">
+                <span :style="{ paddingLeft: levelIndent[row.rowLevel] + 'px' }">{{ row.rowLabel }}</span>
+              </td>
+              <td v-for="col in checkboxItems" :key="col.id" class="cell-td">
+                <el-checkbox v-if="editable" :model-value="getVal(col.id, row.rowIndex)" @change="v => setVal(col.id, row.rowIndex, v)" />
+                <template v-else>
+                  <el-icon v-if="getVal(col.id, row.rowIndex)" color="#67c23a" style="vertical-align:middle"><Select /></el-icon>
+                  <span v-else class="unchecked">—</span>
+                </template>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
@@ -104,6 +114,36 @@ const childrenOf = computed(() => {
   return m
 })
 
+// 收集某根节点的所有行索引（BFS，保持 props.rows 原始顺序）
+function getGroupIndices(rootRowIndex) {
+  const visited = new Set()
+  const queue = [rootRowIndex]
+  while (queue.length) {
+    const ri = queue.shift()
+    if (visited.has(ri)) continue
+    visited.add(ri)
+    ;(childrenOf.value[ri] || []).forEach(ci => queue.push(ci))
+  }
+  return visited
+}
+
+// 找两棵树的根：parentRowIndex == null 的行
+const roots = computed(() => props.rows.filter(r => r.parentRowIndex == null))
+
+// 树B：rowLabel 含"市级"的根（市级全部成立）
+// 树A：其余根（省市县全部成立）
+const groupB = computed(() => {
+  const root = roots.value.find(r => r.rowLabel?.includes('市级'))
+  if (!root) return []
+  const idxSet = getGroupIndices(root.rowIndex)
+  return props.rows.filter(r => idxSet.has(r.rowIndex))
+})
+
+const groupA = computed(() => {
+  const bSet = new Set(groupB.value.map(r => r.rowIndex))
+  return props.rows.filter(r => !bSet.has(r.rowIndex))
+})
+
 // ── 状态 ─────────────────────────────────────────────────
 // checkbox valueMap: `${itemId}_${rowIndex}` -> true
 const valueMap     = ref({})
@@ -149,6 +189,14 @@ function cascadeDown(itemId, rowIndex, checked) {
     _set(itemId, ci, checked)
     cascadeDown(itemId, ci, checked)
   })
+}
+
+function rowClass(row) {
+  return {
+    'row-l1': row.rowLevel === 1,
+    'row-l2': row.rowLevel === 2,
+    'row-l3': row.rowLevel === 3
+  }
 }
 
 // 向上传播：子节点变更后，检查父节点是否应自动勾选/取消
@@ -293,5 +341,11 @@ function emitChange() {
 .row-l3 > .label-td,
 .row-l3 > td { color: #555; }
 
+.group-separator > td {
+  height: 6px;
+  background: #e4e7ed;
+  padding: 0;
+  border: none;
+}
 .unchecked { color: #c0c4cc; font-size: 12px; }
 </style>
