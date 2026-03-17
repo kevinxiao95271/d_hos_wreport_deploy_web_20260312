@@ -85,8 +85,10 @@
             </el-select>
             <el-input v-else v-model="row[leaf.id]" @change="emitChange" />
           </template>
-          <!-- 只读模式：字典字段显示 label，其余直接显示值 -->
-          <span v-else>{{ dictLabel(leaf, row[leaf.id]) }}</span>
+          <!-- 只读模式：字典字段显示 label，文本类型自动换行 -->
+          <div v-else :class="leaf.valueType === 'text' ? 'cell-text-ro' : 'cell-val-ro'">
+            {{ dictLabel(leaf, row[leaf.id]) }}
+          </div>
         </template>
       </el-table-column>
 
@@ -247,12 +249,26 @@ function hasPath(leaf) {
   color: #303133;
 }
 
-/* 文本列单元格给 textarea 足够内边距 */
+/* 覆盖 el-table 默认 white-space:nowrap，让单元格内容可换行 */
 :deep(.el-table .cell) {
   padding: 8px 10px;
+  white-space: normal !important;
+  word-break: break-word;
 }
 :deep(.el-textarea__inner) {
   padding: 6px 8px;
+  line-height: 1.6;
+}
+/* 只读：文本类型左对齐、保留换行 */
+.cell-text-ro {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  text-align: left;
+  min-height: 44px;
+}
+/* 只读：数值/下拉等居中即可 */
+.cell-val-ro {
   line-height: 1.6;
 }
 </style>
