@@ -4,7 +4,6 @@
       :data="dataRows"
       border
       stripe
-      size="small"
       style="width: 100%"
     >
       <!-- 序号列 -->
@@ -16,8 +15,8 @@
         :key="leaf.id"
         :label="headerLabel(leaf)"
         :prop="leaf.id"
-        min-width="120"
-        align="center"
+        :min-width="colMinWidth(leaf)"
+        :align="colAlign(leaf)"
       >
         <template #header>
           <el-tooltip :content="headerLabel(leaf)" placement="top" :disabled="!hasPath(leaf)">
@@ -36,7 +35,6 @@
             <el-select
               v-if="leaf.dictCode"
               v-model="row[leaf.id]"
-              size="small"
               style="width:100%"
               clearable
               @change="emitChange"
@@ -50,11 +48,18 @@
             </el-select>
             <!-- 普通控件 -->
             <el-input
-              v-else-if="leaf.valueType === 'text' || leaf.valueType === 'number'"
+              v-else-if="leaf.valueType === 'text'"
               v-model="row[leaf.id]"
-              :type="leaf.valueType === 'number' ? 'number' : 'text'"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 8 }"
               :placeholder="leaf.placeholder || ''"
-              size="small"
+              @change="emitChange"
+            />
+            <el-input
+              v-else-if="leaf.valueType === 'number'"
+              v-model="row[leaf.id]"
+              type="number"
+              :placeholder="leaf.placeholder || ''"
               @change="emitChange"
             />
             <el-date-picker
@@ -62,14 +67,12 @@
               v-model="row[leaf.id]"
               type="date"
               value-format="YYYY-MM-DD"
-              size="small"
               style="width:100%"
               @change="emitChange"
             />
             <el-select
               v-else-if="leaf.valueType === 'select'"
               v-model="row[leaf.id]"
-              size="small"
               style="width:100%"
               @change="emitChange"
             >
@@ -80,7 +83,7 @@
                 :value="opt"
               />
             </el-select>
-            <el-input v-else v-model="row[leaf.id]" size="small" @change="emitChange" />
+            <el-input v-else v-model="row[leaf.id]" @change="emitChange" />
           </template>
           <!-- 只读模式：字典字段显示 label，其余直接显示值 -->
           <span v-else>{{ dictLabel(leaf, row[leaf.id]) }}</span>
@@ -88,12 +91,11 @@
       </el-table-column>
 
       <!-- 操作列（编辑模式） -->
-      <el-table-column v-if="editable" label="操作" width="70" align="center" fixed="right">
+      <el-table-column v-if="editable" label="操作" width="80" align="center" fixed="right">
         <template #default="{ $index }">
           <el-button
             type="danger"
-            text
-            size="small"
+            link
             :disabled="dataRows.length <= 1"
             @click="removeRow($index)"
           >删除</el-button>
@@ -102,7 +104,7 @@
     </el-table>
 
     <div v-if="editable" class="add-row-btn">
-      <el-button type="primary" plain size="small" @click="addRow">
+      <el-button type="primary" plain @click="addRow">
         <el-icon><Plus /></el-icon> 新增行
       </el-button>
     </div>
@@ -193,6 +195,17 @@ function emitChange() {
   emit('update:rows', rows)
 }
 
+function colMinWidth(leaf) {
+  if (leaf.valueType === 'text') return 220
+  if (leaf.valueType === 'date') return 150
+  if (leaf.valueType === 'select' || leaf.dictCode) return 140
+  return 120
+}
+
+function colAlign(leaf) {
+  return leaf.valueType === 'text' ? 'left' : 'center'
+}
+
 function parseOptions(placeholder) {
   if (!placeholder) return []
   return placeholder.split(',').map(s => s.trim()).filter(Boolean)
@@ -224,13 +237,22 @@ function hasPath(leaf) {
 
 <style scoped>
 .dht-wrapper { width: 100%; }
-.unit-label { font-size: 11px; color: #999; }
-.add-row-btn { margin-top: 8px; }
+.unit-label { font-size: 12px; color: #999; }
+.add-row-btn { margin-top: 10px; }
 .col-full-path {
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.5;
   white-space: normal;
-  word-break: break-all;
+  word-break: break-word;
   color: #303133;
+}
+
+/* 文本列单元格给 textarea 足够内边距 */
+:deep(.el-table .cell) {
+  padding: 8px 10px;
+}
+:deep(.el-textarea__inner) {
+  padding: 6px 8px;
+  line-height: 1.6;
 }
 </style>
