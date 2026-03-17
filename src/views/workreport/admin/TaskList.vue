@@ -95,9 +95,18 @@
 
     <!-- 分配机构对话框 -->
     <el-dialog v-model="scopeVisible" title="分配上报机构" width="500px">
-      <el-checkbox-group v-model="selectedOrgIds">
-        <div v-for="u in userList" :key="u.user_id" style="margin:6px 0">
-          <el-checkbox :label="u.user_id">
+      <!-- 全选控制行 -->
+      <div class="scope-select-all">
+        <el-checkbox
+          v-model="allChecked"
+          :indeterminate="isIndeterminate"
+          @change="toggleAll"
+        >全选（{{ selectedOrgIds.length }}/{{ userList.length }}）</el-checkbox>
+      </div>
+      <el-divider style="margin:8px 0" />
+      <el-checkbox-group v-model="selectedOrgIds" class="scope-list">
+        <div v-for="u in userList" :key="u.userId" class="scope-item">
+          <el-checkbox :value="u.userId">
             {{ u.orgName || u.account }}（{{ u.account }}）
           </el-checkbox>
         </div>
@@ -139,13 +148,23 @@ const templateMap = computed(() => {
   return m
 })
 
-const scopeVisible = ref(false)
-const scopeSaving = ref(false)
-const scopeTaskId = ref(null)
+const scopeVisible   = ref(false)
+const scopeSaving    = ref(false)
+const scopeTaskId    = ref(null)
 const selectedOrgIds = ref([])
-const userList = ref([])
+const userList       = ref([])
 
-onMounted(() => { loadList(); loadTemplates(); loadUsers() })
+const allChecked = computed(() =>
+  userList.value.length > 0 && selectedOrgIds.value.length === userList.value.length
+)
+const isIndeterminate = computed(() =>
+  selectedOrgIds.value.length > 0 && selectedOrgIds.value.length < userList.value.length
+)
+function toggleAll(val) {
+  selectedOrgIds.value = val ? userList.value.map(u => u.userId) : []
+}
+
+onMounted(() => { loadList(); loadTemplates() })
 
 async function loadList(page) {
   if (page) query.pageNo = page
@@ -164,11 +183,6 @@ async function loadList(page) {
 async function loadTemplates() {
   const res = await getTemplateList()
   templateList.value = res.data || []
-}
-
-async function loadUsers() {
-  const res = await getUsers()
-  userList.value = (res.data || []).filter(u => u.account !== 'wr_admin' && !u.account.startsWith('test'))
 }
 
 function resetQuery() { query.taskName = ''; query.status = null; query.statYear = null; loadList(1) }
@@ -216,6 +230,11 @@ async function handleDelete(row) {
 
 async function openScopeDialog(row) {
   scopeTaskId.value = row.id
+  // 懒加载：仅在打开弹窗时才拉取用户列表（避免每次挂载都触发慢查询）
+  if (!userList.value.length) {
+    const res = await getUsers()
+    userList.value = (res.data || []).filter(u => u.account !== 'wr_admin' && !u.account.startsWith('test'))
+  }
   const res = await getTaskScope(row.id)
   selectedOrgIds.value = res.data?.orgIds || []
   scopeVisible.value = true
@@ -238,4 +257,7 @@ const statusType  = s => ({ 0: 'info', 1: 'success', 2: 'danger' }[s] ?? 'info')
 .search-card :deep(.el-card__body) { padding: 16px 20px 0; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .pagination { margin-top: 16px; display: flex; justify-content: flex-end; }
+.scope-select-all { padding: 2px 0 4px; }
+.scope-list { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; }
+.scope-item { padding: 5px 0; }
 </style>

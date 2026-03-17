@@ -46,8 +46,16 @@
           <template #header><span>附件列表</span></template>
           <el-table :data="attachments" border size="small">
             <el-table-column prop="attachName" label="文件名" min-width="200" />
-            <el-table-column label="所属节点" min-width="150">
-              <template #default="{ row }">{{ itemNameMap[row.itemId] || '整体附件' }}</template>
+            <el-table-column label="所属节点" min-width="180">
+              <template #default="{ row }">
+                <el-tooltip
+                  :content="attachFullPath(row)"
+                  placement="top"
+                  :disabled="!row.headerPath || row.headerPath.length <= 2"
+                >
+                  <span>{{ attachDisplayPath(row) }}</span>
+                </el-tooltip>
+              </template>
             </el-table-column>
             <el-table-column label="操作" width="80" align="center">
               <template #default="{ row }">
@@ -115,6 +123,19 @@ const auditForm = reactive({ auditResult: 1, auditRemark: '', resubmitDeadline: 
 const isMatrix = computed(() =>
   templateItems.value.some(i => i.valueType === 'checkbox')
 )
+
+// 附件节点显示：取最后两级，用 " / " 分隔；整体附件直接显示
+function attachDisplayPath(attach) {
+  const p = attach.headerPath
+  if (!p || !p.length) return attach.itemName || '整体附件'
+  return p.length > 1 ? p.slice(-2).join(' / ') : p[0]
+}
+// Tooltip 展示完整路径（>2 级时才启用）
+function attachFullPath(attach) {
+  const p = attach.headerPath
+  if (!p || !p.length) return attach.itemName || '整体附件'
+  return p.join(' / ')
+}
 
 const itemNameMap = computed(() => {
   const m = {}

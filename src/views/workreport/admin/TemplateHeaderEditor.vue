@@ -81,11 +81,44 @@
                     </el-text>
                   </el-form-item>
                   <template v-if="activeNode.valueType !== 'checkbox'">
+                    <!-- 字典绑定：紧跟数据类型，选中后自动联动为下拉 -->
+                    <el-form-item label="字典绑定">
+                      <div>
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <el-select
+                            v-model="activeNode.dictCode"
+                            placeholder="不绑定（自由输入）"
+                            style="width:220px"
+                            clearable
+                            @change="onDictChange"
+                          >
+                            <el-option
+                              v-for="d in dictTypeList"
+                              :key="d.dictCode"
+                              :label="`${d.dictName}（${d.dictCode}）`"
+                              :value="d.dictCode"
+                            />
+                          </el-select>
+                          <el-button
+                            v-if="activeNode.id"
+                            :loading="dictSaving"
+                            @click="applyDictBinding"
+                          >立即应用</el-button>
+                          <el-text v-else type="info" size="small">保存全部后生效</el-text>
+                        </div>
+                        <div class="field-hint" v-if="activeNode.dictCode">
+                          已绑定字典，数据类型已自动切换为「下拉」，填报时渲染为单选下拉框。
+                        </div>
+                        <div class="field-hint muted" v-else>
+                          绑定字典后填报渲染为单选下拉，选项由字典管理统一维护。
+                        </div>
+                      </div>
+                    </el-form-item>
                     <el-form-item label="单位">
                       <el-input v-model="activeNode.unit" placeholder="如：个、%、元" style="width:180px" />
                     </el-form-item>
                     <el-form-item label="占位提示">
-                      <el-input v-model="activeNode.placeholder" placeholder="下拉选项用逗号分隔" />
+                      <el-input v-model="activeNode.placeholder" placeholder="下拉选项用逗号分隔（无字典时有效）" />
                     </el-form-item>
                     <el-form-item label="要求上传附件">
                       <el-radio-group v-model="activeNode.requireAttachment">
@@ -240,9 +273,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getTemplateItems, saveTemplateItems, deleteFormatFile,
+  getTemplateItems, saveTemplateItems, deleteFormatFile, updateItemDict,
   getTemplateRows,  saveTemplateRows
 } from '@/api/template'
+import { getDictTypes } from '@/api/dict'
 import { buildTree, getLeafNodes, getHeaderRows } from '@/utils/headerTree'
 
 const route  = useRoute()
@@ -250,6 +284,10 @@ const router = useRouter()
 const templateId = route.query.id
 
 const activeTab = ref('columns')
+
+// ──────────── 字典类型列表 ────────────
+const dictTypeList  = ref([])
+const dictSaving    = ref(false)
 
 // ──────────── 列定义 ────────────
 const treeRef    = ref()
@@ -269,12 +307,23 @@ const isMatrixTemplate = computed(() =>
 )
 
 onMounted(async () => {
+  // 加载字典类型列表
+  try {
+    const dres = await getDictTypes()
+    dictTypeList.value = dres.data || []
+  } catch { /* ignore */ }
+
   if (!templateId) return
   try {
     const res = await getTemplateItems(templateId)
     const items = res.data || []
     if (items.length) {
-      items.forEach(i => { i.tempId = i.id || `t_${tempIdCounter++}` })
+      // id / parentId 统一转 String，保证与新节点的 "new_N" 类型一致
+      items.forEach(i => {
+        i.id       = i.id       != null ? String(i.id)       : null
+        i.parentId = i.parentId != null ? String(i.parentId) : null
+        i.tempId   = i.id || `t_${tempIdCounter++}`
+      })
       treeData.value = buildTree(items)
     }
   } catch { /* empty template */ }
@@ -300,9 +349,10 @@ function addChildNode(parent) {
 }
 
 function newNode(parentTempId, sort) {
+  const tid = makeTempId()
   return {
-    tempId: makeTempId(),
-    id: null,
+    tempId: tid,
+    id: tid,       // 新节点用 tempId 作为批次内唯一标识，后端会映射为真实 Snowflake id
     parentTempId,
     itemName: '',
     isLeaf: 1,
@@ -310,6 +360,7 @@ function newNode(parentTempId, sort) {
     unit: '',
     placeholder: '',
     requireAttachment: 0,
+    dictCode: null,
     sortNum: sort,
     formatTemplateName: null,
     formatTemplateUrl: null,
@@ -362,7 +413,11 @@ async function saveAllItems() {
     await saveTemplateItems(templateId, items)
     const res = await getTemplateItems(templateId)
     const loaded = res.data || []
-    loaded.forEach(i => { i.tempId = i.id })
+    loaded.forEach(i => {
+      i.id       = i.id       != null ? String(i.id)       : null
+      i.parentId = i.parentId != null ? String(i.parentId) : null
+      i.tempId   = i.id
+    })
     treeData.value = buildTree(loaded)
     activeNode.value = null
     ElMessage.success('列定义保存成功')
@@ -373,7 +428,12 @@ function buildSavePayload(nodes, parentId, depth, colTracker) {
   const result = []
   nodes.forEach((node, idx) => {
     const hasChildren = node.children && node.children.length > 0
+    // id / parentId 统一转 String：已有节点是 Long 数字，新节点是 "new_N" 字符串
+    const clientId     = node.id != null ? String(node.id) : null
+    const clientParent = parentId  != null ? String(parentId)  : null
     const payload = {
+      id:                clientId,
+      parentId:          clientParent,
       itemName:          node.itemName || '列' + (idx + 1),
       headerRow:         depth,
       colIndex:          colTracker.col,
@@ -384,12 +444,13 @@ function buildSavePayload(nodes, parentId, depth, colTracker) {
       unit:              node.unit || null,
       placeholder:       node.placeholder || null,
       requireAttachment: node.requireAttachment ?? 0,
+      dictCode:          node.dictCode || null,
       sortNum:           node.sortNum || (idx + 1)
     }
     if (!hasChildren) colTracker.col++
     result.push(payload)
     if (hasChildren) {
-      result.push(...buildSavePayload(node.children, null, depth + 1, colTracker))
+      result.push(...buildSavePayload(node.children, node.id, depth + 1, colTracker))
     }
   })
   return result
@@ -402,6 +463,23 @@ function onFormatUpload(res) {
     activeNode.value.id = res.data.id
     ElMessage.success('格式模板上传成功')
   }
+}
+
+// 字典选中时自动联动数据类型为 select
+function onDictChange(val) {
+  if (val && activeNode.value) {
+    activeNode.value.valueType = 'select'
+  }
+}
+
+// 已保存的节点（有 id）直接调单独接口实时切换字典绑定
+async function applyDictBinding() {
+  if (!activeNode.value?.id) return
+  dictSaving.value = true
+  try {
+    await updateItemDict(activeNode.value.id, activeNode.value.dictCode)
+    ElMessage.success(activeNode.value.dictCode ? '字典绑定已应用' : '已解绑字典')
+  } finally { dictSaving.value = false }
 }
 
 async function clearFormatFile() {
@@ -478,4 +556,6 @@ async function saveAllRows() {
 .preview-table { border-collapse: collapse; min-width: 100%; font-size: 13px; }
 .preview-table th, .preview-table td { border: 1px solid #dcdfe6; padding: 6px 12px; }
 .tips { color: #999; font-size: 12px; }
+.field-hint { margin-top: 5px; font-size: 12px; color: #409eff; line-height: 1.5; }
+.field-hint.muted { color: #999; }
 </style>

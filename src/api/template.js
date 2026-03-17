@@ -14,3 +14,4 @@ export const saveTemplateItems     = (id, items)  => request.post(`/wr/template/
 export const saveTemplateRows      = (id, rows)   => request.post(`/wr/template/rows/save/${id}`, rows)
 export const uploadFormatFile      = (itemId, formData) => request.post(`/wr/template/item/upload-format/${itemId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const deleteFormatFile      = itemId     => request.post(`/wr/template/item/delete-format/${itemId}`)
+export const updateItemDict        = (itemId, dictCode) => request.post(`/wr/template/item/dict/${itemId}`, { dictCode: dictCode || null })
