@@ -24,6 +24,10 @@
             <el-icon><DataAnalysis /></el-icon>
             <span>上报审阅</span>
           </el-menu-item>
+          <el-menu-item index="/admin/crossview">
+            <el-icon><Grid /></el-icon>
+            <span>数据汇聚</span>
+          </el-menu-item>
         </template>
         <template v-else>
           <el-menu-item index="/org/task-list">
@@ -78,7 +82,7 @@ const userStore = useUserStore()
 
 const activeMenu = computed(() => route.path)
 const currentTitle = computed(() => route.meta?.title || '')
-const cachedViews = ['TemplateList', 'TaskList', 'RecordAdminList', 'OrgTaskList', 'OrgRecordList']
+const cachedViews = ['TemplateList', 'TaskList', 'RecordAdminList', 'CrossView', 'OrgTaskList', 'OrgRecordList']
 
 async function handleLogout() {
   await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })

@@ -14,6 +14,7 @@ const routes = [
       { path: '/admin/task-list',       name: 'TaskList',           component: () => import('@/views/workreport/admin/TaskList.vue'),           meta: { title: '任务管理',   role: 'deptAdmin' } },
       { path: '/admin/record-review',   name: 'RecordAdminList',    component: () => import('@/views/workreport/admin/RecordAdminList.vue'),    meta: { title: '上报审阅',   role: 'deptAdmin' } },
       { path: '/admin/record-detail',   name: 'RecordAdminDetail',  component: () => import('@/views/workreport/admin/RecordAdminDetail.vue'),  meta: { title: '上报详情',   role: 'deptAdmin', hidden: true } },
+      { path: '/admin/crossview',        name: 'CrossView',          component: () => import('@/views/workreport/admin/CrossView.vue'),          meta: { title: '数据汇聚',   role: 'deptAdmin' } },
       // 机构端
       { path: '/org/task-list',    name: 'OrgTaskList',    component: () => import('@/views/workreport/org/OrgTaskList.vue'),    meta: { title: '上报任务', role: 'org' } },
       { path: '/org/report-form',  name: 'ReportForm',     component: () => import('@/views/workreport/org/ReportForm.vue'),     meta: { title: '填报表单', role: 'org', hidden: true } },
