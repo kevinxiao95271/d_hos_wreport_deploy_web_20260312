@@ -32,8 +32,25 @@
         <template #default="{ row, $index }">
           <!-- 编辑模式 -->
           <template v-if="editable">
+            <!-- 字典下拉（优先级最高） -->
+            <el-select
+              v-if="leaf.dictCode"
+              v-model="row[leaf.id]"
+              size="small"
+              style="width:100%"
+              clearable
+              @change="emitChange"
+            >
+              <el-option
+                v-for="opt in dictsCache[leaf.dictCode] || []"
+                :key="opt.itemValue"
+                :label="opt.itemLabel"
+                :value="opt.itemValue"
+              />
+            </el-select>
+            <!-- 普通控件 -->
             <el-input
-              v-if="leaf.valueType === 'text' || leaf.valueType === 'number'"
+              v-else-if="leaf.valueType === 'text' || leaf.valueType === 'number'"
               v-model="row[leaf.id]"
               :type="leaf.valueType === 'number' ? 'number' : 'text'"
               :placeholder="leaf.placeholder || ''"
@@ -65,8 +82,8 @@
             </el-select>
             <el-input v-else v-model="row[leaf.id]" size="small" @change="emitChange" />
           </template>
-          <!-- 只读模式 -->
-          <span v-else>{{ row[leaf.id] || '—' }}</span>
+          <!-- 只读模式：字典字段显示 label，其余直接显示值 -->
+          <span v-else>{{ dictLabel(leaf, row[leaf.id]) }}</span>
         </template>
       </el-table-column>
 
@@ -95,6 +112,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { getLeafNodes, valuesToMap, getRowIndices } from '@/utils/headerTree'
+import { getDictItems } from '@/api/dict'
 
 const props = defineProps({
   items:    { type: Array, default: () => [] },
@@ -105,6 +123,20 @@ const props = defineProps({
 const emit = defineEmits(['update:rows'])
 
 const leafNodes = computed(() => getLeafNodes(props.items))
+
+// dictCode → [{itemLabel, itemValue}]
+const dictsCache = ref({})
+watch(leafNodes, async (leaves) => {
+  const codes = [...new Set(leaves.filter(l => l.dictCode).map(l => l.dictCode))]
+  for (const code of codes) {
+    if (!dictsCache.value[code]) {
+      try {
+        const res = await getDictItems(code)
+        dictsCache.value[code] = res.data || []
+      } catch { dictsCache.value[code] = [] }
+    }
+  }
+}, { immediate: true })
 
 // Internal row data: array of objects { [itemId]: value }
 const dataRows = ref([])
@@ -167,6 +199,14 @@ function parseOptions(placeholder) {
 }
 
 // headerPath 可能是数组或字符串，统一转为 "A / B / C" 格式
+// 只读时将字典值转回 label 展示
+function dictLabel(leaf, val) {
+  if (!leaf.dictCode || val == null || val === '') return val || '—'
+  const opts = dictsCache.value[leaf.dictCode] || []
+  const opt = opts.find(o => o.itemValue === val)
+  return opt ? opt.itemLabel : val || '—'
+}
+
 function headerLabel(leaf) {
   const p = leaf.headerPath
   if (!p) return leaf.itemName

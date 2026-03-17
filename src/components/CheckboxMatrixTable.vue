@@ -156,8 +156,7 @@ watch(
     const cmap = {}
     const nmap = {}
     vals.forEach(v => {
-      const isNullRow = v.rowIndex === null || v.rowIndex === undefined
-      if (isNullRow) {
+      if (v.rowIndex === 0) {
         nmap[v.itemId] = v.cellValue !== '' && v.cellValue != null ? Number(v.cellValue) : null
       } else if (v.cellValue === '1') {
         cmap[`${v.itemId}_${v.rowIndex}`] = true
@@ -235,13 +234,17 @@ function emitChange() {
     cells
   }))
 
-  // number rows（rowIndex: null）
+  // number rows（rowIndex: 0，约定值）
+  const numberCells = []
   numberItems.value.forEach(item => {
     const val = numberValues.value[item.id]
     if (val !== null && val !== undefined && val !== '') {
-      rows.push({ rowIndex: null, cells: [{ itemId: item.id, value: String(val) }] })
+      numberCells.push({ itemId: item.id, value: String(val) })
     }
   })
+  if (numberCells.length) {
+    rows.push({ rowIndex: 0, cells: numberCells })
+  }
 
   emit('update:rows', rows)
 }
