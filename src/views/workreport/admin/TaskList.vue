@@ -106,9 +106,16 @@
       <el-divider style="margin:8px 0" />
       <el-checkbox-group v-model="selectedOrgIds" class="scope-list">
         <div v-for="u in userList" :key="u.userId" class="scope-item">
-          <el-checkbox :value="u.userId">
-            {{ u.orgName || u.account }}（{{ u.account }}）
-          </el-checkbox>
+          <el-tooltip
+            :content="isOrgLocked(u) ? '请先驳回后再移出' : ''"
+            :disabled="!isOrgLocked(u)"
+            placement="right"
+          >
+            <el-checkbox :value="u.userId" :disabled="isOrgLocked(u)">
+              {{ u.orgName || u.account }}（{{ u.account }}）
+              <el-tag v-if="isOrgLocked(u)" size="small" type="warning" style="margin-left:4px">已提交</el-tag>
+            </el-checkbox>
+          </el-tooltip>
         </div>
       </el-checkbox-group>
       <template #footer>
@@ -148,20 +155,33 @@ const templateMap = computed(() => {
   return m
 })
 
-const scopeVisible   = ref(false)
-const scopeSaving    = ref(false)
-const scopeTaskId    = ref(null)
-const selectedOrgIds = ref([])
-const userList       = ref([])
+const scopeVisible      = ref(false)
+const scopeSaving       = ref(false)
+const scopeTaskId       = ref(null)
+const selectedOrgIds    = ref([])
+const userList          = ref([])
+// orgId(string) -> recordStatus，用于判断是否锁定
+const scopeOrgStatusMap = ref({})
 
+// 未锁定的机构（recordStatus < 1 或 null）
+const freeUsers = computed(() =>
+  userList.value.filter(u => !isOrgLocked(u))
+)
 const allChecked = computed(() =>
-  userList.value.length > 0 && selectedOrgIds.value.length === userList.value.length
+  freeUsers.value.length > 0 && freeUsers.value.every(u => selectedOrgIds.value.includes(u.userId))
 )
 const isIndeterminate = computed(() =>
-  selectedOrgIds.value.length > 0 && selectedOrgIds.value.length < userList.value.length
+  freeUsers.value.some(u => selectedOrgIds.value.includes(u.userId)) && !allChecked.value
 )
 function toggleAll(val) {
-  selectedOrgIds.value = val ? userList.value.map(u => u.userId) : []
+  const lockedIds = userList.value.filter(isOrgLocked).map(u => u.userId)
+  selectedOrgIds.value = val
+    ? [...new Set([...lockedIds, ...freeUsers.value.map(u => u.userId)])]
+    : lockedIds  // 全取消时锁定的保留
+}
+function isOrgLocked(u) {
+  const status = scopeOrgStatusMap.value[String(u.orgId)]
+  return status != null && status >= 1
 }
 
 onMounted(() => { loadList(); loadTemplates() })
@@ -236,6 +256,12 @@ async function openScopeDialog(row) {
     userList.value = (res.data || []).filter(u => u.account !== 'wr_admin' && !u.account.startsWith('test'))
   }
   const res = await getTaskScope(row.id)
+  // 构建 orgId -> recordStatus 映射，用于禁用已有记录的机构
+  const orgsWithStatus = res.data?.orgs || []
+  const statusMap = {}
+  orgsWithStatus.forEach(o => { statusMap[String(o.orgId)] = o.recordStatus })
+  scopeOrgStatusMap.value = statusMap
+  // 当前已分配的 orgIds（与 userList 中 userId 对应）
   selectedOrgIds.value = res.data?.orgIds || []
   scopeVisible.value = true
 }
