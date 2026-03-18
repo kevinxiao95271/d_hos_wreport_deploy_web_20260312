@@ -30,6 +30,21 @@
         </div>
       </template>
 
+      <!-- 字数进度条 -->
+      <div v-if="charLimit.enabled" class="char-limit-bar">
+        <span class="char-label">已填字数</span>
+        <div class="bar-track">
+          <div
+            class="bar-fill"
+            :class="{ warn: charPct >= 80, over: charLimit.current > charLimit.max }"
+            :style="{ width: charPct + '%' }"
+          />
+        </div>
+        <span class="char-count" :class="{ over: charLimit.current > charLimit.max }">
+          {{ charLimit.current }} / {{ charLimit.max }} 字
+        </span>
+      </div>
+
       <!-- 矩阵填报 -->
       <CheckboxMatrixTable
         v-if="isMatrix"
@@ -109,12 +124,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTaskDetail } from '@/api/task'
 import { getTemplateFullDetail } from '@/api/template'
-import { getMyRecord, getRecordDetail, saveRecord, submitRecord } from '@/api/record'
+import { getMyRecord, getRecordDetail, saveRecord, submitRecord, getCharCount } from '@/api/record'
 import { getAttachments, uploadAttachment, deleteAttachment } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
@@ -127,6 +142,11 @@ const templateId = route.query.templateId
 const loading     = ref(true)
 const draftSaving = ref(false)
 const submitting  = ref(false)
+
+// 字数进度条
+const charLimit = reactive({ enabled: false, current: 0, max: 0 })
+const charPct   = computed(() => charLimit.max > 0 ? Math.min(charLimit.current / charLimit.max * 100, 100) : 0)
+let debounceTimer = null
 
 const taskDetail    = ref({})
 const templateItems = ref([])
@@ -174,18 +194,43 @@ async function loadAll() {
       if (recRes.data) {
         record.value   = recRes.data
         recordId.value = recRes.data.id
-        const [detailRes, attachRes] = await Promise.all([
+        const [detailRes, attachRes, countRes] = await Promise.all([
           getRecordDetail(recRes.data.id),
-          getAttachments(recRes.data.id)
+          getAttachments(recRes.data.id),
+          getCharCount(recRes.data.id).catch(() => null)
         ])
         recordValues.value = detailRes.data.values || []
         attachments.value  = attachRes.data || []
+        if (countRes?.data) {
+          charLimit.enabled = countRes.data.enabled
+          charLimit.current = countRes.data.currentChars
+          charLimit.max     = countRes.data.maxTotalChars
+        }
       }
     } catch { /* no record yet, start fresh */ }
   } finally { loading.value = false }
 }
 
-function onRowsChange(rows) { currentRows.value = rows }
+function onRowsChange(rows) {
+  currentRows.value = rows
+  if (!charLimit.enabled || !recordId.value) return
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(autoSaveAndCount, 500)
+}
+
+async function autoSaveAndCount() {
+  try {
+    const payload = { taskId, rows: currentRows.value, recordId: recordId.value }
+    await saveRecord(payload)
+    const countRes = await getCharCount(recordId.value)
+    if (countRes?.data) {
+      charLimit.current = countRes.data.currentChars
+      charLimit.max     = countRes.data.maxTotalChars
+    }
+  } catch { /* silent — toast already handled by interceptor */ }
+}
+
+onBeforeUnmount(() => clearTimeout(debounceTimer))
 
 async function saveDraft() {
   draftSaving.value = true
@@ -226,7 +271,7 @@ async function handleSubmit() {
     await submitRecord({ recordId: recordId.value })
     ElMessage.success('提交成功，等待审核')
     router.push('/org/record-list')
-  } finally { submitting.value = false }
+  } catch { /* interceptor already shows error toast (incl. 4032 字数超限) */ } finally { submitting.value = false }
 }
 
 async function uploadFile({ file }, itemId) {
@@ -281,4 +326,32 @@ function leafHeaderLabel(leaf) {
   gap: 12px;
   margin: 16px -20px -20px;
 }
+.char-limit-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+.char-label { font-size: 13px; color: #606266; white-space: nowrap; }
+.bar-track {
+  flex: 1;
+  height: 6px;
+  background: #e4e7ed;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 3px;
+  transition: width 0.3s, background 0.3s;
+}
+.bar-fill.warn { background: #ff9800; }
+.bar-fill.over { background: #f44336; }
+.char-count { font-size: 13px; color: #606266; white-space: nowrap; }
+.char-count.over { color: #f44336; font-weight: bold; }
 </style>

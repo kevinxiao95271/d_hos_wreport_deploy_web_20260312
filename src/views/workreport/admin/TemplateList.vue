@@ -73,6 +73,22 @@
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入描述" />
         </el-form-item>
+        <el-form-item label="字数限制">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <el-checkbox v-model="charLimitEnabled">启用总字数限制</el-checkbox>
+            <template v-if="charLimitEnabled">
+              <span style="color:#606266;font-size:13px">上限：</span>
+              <el-input-number
+                v-model="charLimitMax"
+                :min="100"
+                :step="500"
+                style="width:140px"
+                placeholder="字数上限"
+              />
+              <span style="color:#909399;font-size:12px">字</span>
+            </template>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -83,10 +99,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTemplatePage, addTemplate, updateTemplate, deleteTemplate, updateTemplateStatus } from '@/api/template'
+import { getTemplatePage, getTemplateDetail, addTemplate, updateTemplate, deleteTemplate, updateTemplateStatus } from '@/api/template'
 
 const router = useRouter()
 const loading = ref(false)
@@ -94,12 +110,16 @@ const list = ref([])
 const total = ref(0)
 const query = reactive({ pageNo: 1, pageSize: 10, templateName: '', status: null })
 
-const dialogVisible = ref(false)
-const submitting = ref(false)
-const editId = ref(null)
-const formRef = ref()
-const form = reactive({ templateName: '', description: '' })
+const dialogVisible     = ref(false)
+const submitting        = ref(false)
+const editId            = ref(null)
+const formRef           = ref()
+const form              = reactive({ templateName: '', description: '' })
+const charLimitEnabled  = ref(false)
+const charLimitMax      = ref(1000)
 const rules = { templateName: [{ required: true, message: '请输入模板名称', trigger: 'blur' }] }
+
+watch(charLimitEnabled, val => { if (!val) charLimitMax.value = 1000 })
 
 onMounted(() => loadList())
 
@@ -123,24 +143,36 @@ function resetQuery() {
 function openAddDialog() {
   editId.value = null
   Object.assign(form, { templateName: '', description: '' })
+  charLimitEnabled.value = false
+  charLimitMax.value = 1000
   dialogVisible.value = true
 }
 
-function openEditDialog(row) {
+async function openEditDialog(row) {
   editId.value = row.id
   Object.assign(form, { templateName: row.templateName, description: row.description })
+  charLimitEnabled.value = false
+  charLimitMax.value = 1000
   dialogVisible.value = true
+  // 拉取详情回显 maxTotalChars
+  try {
+    const res = await getTemplateDetail(row.id)
+    const max = res.data?.maxTotalChars ?? 0
+    charLimitEnabled.value = max > 0
+    charLimitMax.value = max > 0 ? max : 1000
+  } catch { /* 不影响编辑流程 */ }
 }
 
 async function handleSubmit() {
   try { await formRef.value.validate() } catch { return }
   submitting.value = true
+  const maxTotalChars = charLimitEnabled.value ? (charLimitMax.value || 0) : 0
   try {
     if (editId.value) {
-      await updateTemplate({ id: editId.value, ...form })
+      await updateTemplate({ id: editId.value, ...form, maxTotalChars })
       ElMessage.success('编辑成功')
     } else {
-      await addTemplate({ ...form, items: [] })
+      await addTemplate({ ...form, maxTotalChars, items: [] })
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
