@@ -85,7 +85,7 @@
               <el-button type="success" :loading="auditing" @click="doAudit(1)">
                 <el-icon><Check /></el-icon> 审核通过
               </el-button>
-              <el-button type="danger" :loading="auditing" @click="auditForm.auditResult = 2; doAudit(2)">
+              <el-button type="danger" :loading="auditing" @click="auditForm.auditResult = 2; if(!auditForm.resubmitDeadline) auditForm.resubmitDeadline = defaultDeadline(); doAudit(2)">
                 <el-icon><Close /></el-icon> 驳回
               </el-button>
             </el-form-item>
@@ -118,7 +118,14 @@ const templateItems = ref([])
 const templateRows  = ref([])
 const attachments   = ref([])
 
-const auditForm = reactive({ auditResult: 1, auditRemark: '', resubmitDeadline: '' })
+function defaultDeadline() {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+const auditForm = reactive({ auditResult: 1, auditRemark: '', resubmitDeadline: defaultDeadline() })
 
 const isMatrix = computed(() =>
   templateItems.value.some(i => i.valueType === 'checkbox')
