@@ -171,7 +171,14 @@ const currentRows   = ref([])
 const attachments   = ref([])
 
 const templateType = ref('form')   // 'form' | 'score'
-const isScore  = computed(() => templateType.value === 'score')
+const isScore = computed(() =>
+  // 显式字段优先；若后端未返回 templateType，则从 items 特征推断：
+  // 任意叶子节点有 minAttachments/maxAttachments/scoreValue 即视为 score 模板
+  templateType.value === 'score' ||
+  templateItems.value.some(i =>
+    i.isLeaf === 1 && (i.minAttachments > 0 || i.maxAttachments > 0 || i.scoreValue > 0)
+  )
+)
 const isMatrix = computed(() =>
   !isScore.value && templateItems.value.some(i => i.valueType === 'checkbox')
 )
