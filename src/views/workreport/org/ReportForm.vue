@@ -140,7 +140,7 @@
 import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTaskDetail } from '@/api/task'
+import { getActiveTasks } from '@/api/task'
 import { getTemplateFullDetail, getTemplateDetail } from '@/api/template'
 import { getMyRecord, getRecordDetail, saveRecord, submitRecord, getCharCount } from '@/api/record'
 import { getAttachments, uploadAttachment, deleteAttachment } from '@/api/attachment'
@@ -215,12 +215,12 @@ onMounted(loadAll)
 async function loadAll() {
   loading.value = true
   try {
-    const [taskRes, fullRes, tplRes] = await Promise.all([
-      getTaskDetail(taskId),
+    const [taskListRes, fullRes, tplRes] = await Promise.all([
+      getActiveTasks(),
       getTemplateFullDetail(templateId),
       getTemplateDetail(templateId).catch(() => null)
     ])
-    taskDetail.value    = taskRes.data
+    taskDetail.value    = (taskListRes.data || []).find(t => String(t.id) === String(taskId)) || {}
     templateItems.value = fullRes.data.items || []
     templateRows.value  = fullRes.data.rows  || []
     if (tplRes?.data?.templateType) templateType.value = tplRes.data.templateType
