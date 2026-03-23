@@ -46,9 +46,10 @@
         </span>
       </div>
 
-      <!-- 评分细则：纯附件上传模式 -->
+      <!-- 评分细则：卡片上传模式 -->
       <ScoreUploadForm
         v-if="isScore"
+        ref="scoreFormRef"
         :items="templateItems"
         :attachments="attachments"
         :record-id="recordId"
@@ -113,7 +114,21 @@
     <!-- 底部操作栏 -->
     <div v-if="canEdit" class="bottom-bar">
       <el-button v-if="!isScore" size="large" :loading="draftSaving" @click="saveDraft">保存草稿</el-button>
-      <el-button type="primary" size="large" :loading="submitting" @click="handleSubmit">提 交</el-button>
+      <el-tooltip
+        v-if="isScore && scoreFormRef && !scoreFormRef.canSubmit"
+        content="请先完成所有必传指标"
+        placement="top"
+      >
+        <span>
+          <el-button type="primary" size="large" disabled>提 交</el-button>
+        </span>
+      </el-tooltip>
+      <el-button
+        v-else
+        type="primary" size="large"
+        :loading="submitting"
+        @click="handleSubmit"
+      >提 交</el-button>
     </div>
 
     <div v-else class="bottom-bar">
@@ -140,9 +155,10 @@ const router = useRouter()
 const taskId     = route.query.taskId
 const templateId = route.query.templateId
 
-const loading     = ref(true)
-const draftSaving = ref(false)
-const submitting  = ref(false)
+const loading      = ref(true)
+const draftSaving  = ref(false)
+const submitting   = ref(false)
+const scoreFormRef = ref(null)
 
 // 字数进度条
 const charLimit = reactive({ enabled: false, current: 0, max: 0 })
