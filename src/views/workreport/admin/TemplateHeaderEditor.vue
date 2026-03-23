@@ -33,7 +33,9 @@
                     <el-icon v-if="data.isLeaf === 1" color="#67c23a"><Document /></el-icon>
                     <el-icon v-else color="#409eff"><Folder /></el-icon>
                     <span class="node-name">{{ data.itemName || '(未命名)' }}</span>
-                    <span class="node-type" v-if="data.isLeaf === 1">{{ data.valueType }}</span>
+                    <span class="node-type" v-if="data.isLeaf === 1 && !isScoreTemplate">{{ data.valueType }}</span>
+                    <span class="node-type" v-if="isScoreTemplate && data.isLeaf === 0 && data.scoreValue > 0">{{ data.scoreValue }}分</span>
+                    <span class="node-type" v-if="isScoreTemplate && data.isLeaf === 1">{{ data.minAttachments }}~{{ data.maxAttachments || '∞' }}个</span>
                     <div class="node-actions" @click.stop>
                       <el-icon class="action-icon" title="添加子节点" @click="addChildNode(data)"><Plus /></el-icon>
                       <el-icon class="action-icon danger" title="删除节点" @click="deleteNode(node, data)"><Delete /></el-icon>
@@ -142,6 +144,28 @@
                         <el-button size="small">上传格式模板</el-button>
                       </el-upload>
                       <span v-if="!activeNode.id" class="tips">保存后可上传格式模板</span>
+                    </el-form-item>
+                  </template>
+                </template>
+                <!-- 评分细则模板专属字段 -->
+                <template v-if="isScoreTemplate">
+                  <el-divider content-position="left" style="margin:8px 0">
+                    <el-text type="warning" size="small">评分细则配置</el-text>
+                  </el-divider>
+                  <!-- 父节点：配置分值 -->
+                  <el-form-item v-if="activeNode.isLeaf === 0" label="分值（分）">
+                    <el-input-number v-model="activeNode.scoreValue" :min="0" :step="5" style="width:140px" />
+                    <el-text type="info" size="small" style="margin-left:8px">父节点分值，叶子节点填 0</el-text>
+                  </el-form-item>
+                  <!-- 叶子节点：配置附件数量 -->
+                  <template v-if="activeNode.isLeaf === 1">
+                    <el-form-item label="最少上传数">
+                      <el-input-number v-model="activeNode.minAttachments" :min="0" style="width:120px" />
+                      <el-text type="info" size="small" style="margin-left:8px">0 = 不要求</el-text>
+                    </el-form-item>
+                    <el-form-item label="最多上传数">
+                      <el-input-number v-model="activeNode.maxAttachments" :min="0" style="width:120px" />
+                      <el-text type="info" size="small" style="margin-left:8px">0 = 不限制</el-text>
                     </el-form-item>
                   </template>
                 </template>
@@ -273,7 +297,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getTemplateItems, saveTemplateItems, deleteFormatFile, updateItemDict,
+  getTemplateItems, getTemplateDetail, saveTemplateItems, deleteFormatFile, updateItemDict,
   getTemplateRows,  saveTemplateRows
 } from '@/api/template'
 import { getDictTypes } from '@/api/dict'
@@ -283,7 +307,10 @@ const route  = useRoute()
 const router = useRouter()
 const templateId = route.query.id
 
-const activeTab = ref('columns')
+const activeTab    = ref('columns')
+const templateType = ref('form')   // 'form' | 'score'
+
+const isScoreTemplate = computed(() => templateType.value === 'score')
 
 // ──────────── 字典类型列表 ────────────
 const dictTypeList  = ref([])
@@ -307,10 +334,14 @@ const isMatrixTemplate = computed(() =>
 )
 
 onMounted(async () => {
-  // 加载字典类型列表
+  // 加载字典类型列表 + 模板类型
   try {
-    const dres = await getDictTypes()
+    const [dres, tRes] = await Promise.all([
+      getDictTypes(),
+      getTemplateDetail(templateId)
+    ])
     dictTypeList.value = dres.data || []
+    if (tRes.data?.templateType) templateType.value = tRes.data.templateType
   } catch { /* ignore */ }
 
   if (!templateId) return
@@ -362,6 +393,9 @@ function newNode(parentTempId, sort) {
     requireAttachment: 0,
     dictCode: null,
     sortNum: sort,
+    scoreValue: 0,
+    minAttachments: 0,
+    maxAttachments: 0,
     formatTemplateName: null,
     formatTemplateUrl: null,
     children: []
@@ -445,7 +479,10 @@ function buildSavePayload(nodes, parentId, depth, colTracker) {
       placeholder:       node.placeholder || null,
       requireAttachment: node.requireAttachment ?? 0,
       dictCode:          node.dictCode || null,
-      sortNum:           node.sortNum || (idx + 1)
+      sortNum:           node.sortNum || (idx + 1),
+      scoreValue:        node.scoreValue ?? 0,
+      minAttachments:    node.minAttachments ?? 0,
+      maxAttachments:    node.maxAttachments ?? 0
     }
     if (!hasChildren) colTracker.col++
     result.push(payload)

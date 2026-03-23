@@ -111,7 +111,7 @@
             :disabled="!isOrgLocked(u)"
             placement="right"
           >
-            <el-checkbox :value="u.userId" :disabled="isOrgLocked(u)">
+            <el-checkbox :value="u.orgId" :disabled="isOrgLocked(u)">
               {{ u.orgName || u.account }}（{{ u.account }}）
               <el-tag v-if="isOrgLocked(u)" size="small" type="warning" style="margin-left:4px">已提交</el-tag>
             </el-checkbox>
@@ -168,16 +168,16 @@ const freeUsers = computed(() =>
   userList.value.filter(u => !isOrgLocked(u))
 )
 const allChecked = computed(() =>
-  freeUsers.value.length > 0 && freeUsers.value.every(u => selectedOrgIds.value.includes(u.userId))
+  freeUsers.value.length > 0 && freeUsers.value.every(u => selectedOrgIds.value.includes(u.orgId))
 )
 const isIndeterminate = computed(() =>
-  freeUsers.value.some(u => selectedOrgIds.value.includes(u.userId)) && !allChecked.value
+  freeUsers.value.some(u => selectedOrgIds.value.includes(u.orgId)) && !allChecked.value
 )
 function toggleAll(val) {
-  const lockedIds = userList.value.filter(isOrgLocked).map(u => u.userId)
+  const lockedIds = userList.value.filter(isOrgLocked).map(u => u.orgId)
   selectedOrgIds.value = val
-    ? [...new Set([...lockedIds, ...freeUsers.value.map(u => u.userId)])]
-    : lockedIds  // 全取消时锁定的保留
+    ? [...new Set([...lockedIds, ...freeUsers.value.map(u => u.orgId)])]
+    : lockedIds
 }
 function isOrgLocked(u) {
   const status = scopeOrgStatusMap.value[String(u.orgId)]

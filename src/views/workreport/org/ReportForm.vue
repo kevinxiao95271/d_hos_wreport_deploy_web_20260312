@@ -22,7 +22,8 @@
       <template #header>
         <div class="card-header">
           <div>
-            <el-tag v-if="isMatrix" type="warning" style="margin-right:8px">勾选矩阵</el-tag>
+            <el-tag v-if="isScore"  type="danger"  style="margin-right:8px">评分细则</el-tag>
+            <el-tag v-else-if="isMatrix" type="warning" style="margin-right:8px">勾选矩阵</el-tag>
             <el-tag v-else type="primary" style="margin-right:8px">标准表头</el-tag>
             <span class="task-meta">截止日期：{{ taskDetail.deadline || '无限制' }}</span>
             <span v-if="taskDetail.remark" class="task-meta" style="margin-left:16px">备注：{{ taskDetail.remark }}</span>
@@ -30,8 +31,8 @@
         </div>
       </template>
 
-      <!-- 字数进度条 -->
-      <div v-if="charLimit.enabled" class="char-limit-bar">
+      <!-- 字数进度条（仅 form 类型） -->
+      <div v-if="!isScore && charLimit.enabled" class="char-limit-bar">
         <span class="char-label">已填字数</span>
         <div class="bar-track">
           <div
@@ -45,9 +46,21 @@
         </span>
       </div>
 
+      <!-- 评分细则：纯附件上传模式 -->
+      <ScoreUploadForm
+        v-if="isScore"
+        :items="templateItems"
+        :attachments="attachments"
+        :record-id="recordId"
+        :editable="canEdit"
+        @attachment-added="att => attachments.push(att)"
+        @attachment-removed="id => attachments = attachments.filter(a => a.id !== id)"
+        @need-record="handleNeedRecord"
+      />
+
       <!-- 矩阵填报 -->
       <CheckboxMatrixTable
-        v-if="isMatrix"
+        v-else-if="isMatrix"
         :items="templateItems"
         :rows="templateRows"
         :values="recordValues"
@@ -65,8 +78,8 @@
         @update:rows="onRowsChange"
       />
 
-      <!-- 附件上传区（非矩阵模板才有节点级附件） -->
-      <template v-if="canEdit && !isMatrix">
+      <!-- 附件上传区（非矩阵、非评分模板才有节点级附件） -->
+      <template v-if="canEdit && !isMatrix && !isScore">
         <div v-for="leaf in requireAttachLeaves" :key="leaf.id" style="margin-top:16px">
           <div class="attach-label">
             <span>{{ leafHeaderLabel(leaf) }}</span>
@@ -92,8 +105,8 @@
         </div>
       </template>
 
-      <!-- 整体附件 -->
-      <template v-if="canEdit">
+      <!-- 整体附件（非评分模板） -->
+      <template v-if="canEdit && !isScore">
         <div style="margin-top:16px">
           <div class="attach-label"><span>附件（可选）</span></div>
           <el-upload
@@ -112,7 +125,7 @@
 
     <!-- 底部操作栏 -->
     <div v-if="canEdit" class="bottom-bar">
-      <el-button size="large" :loading="draftSaving" @click="saveDraft">保存草稿</el-button>
+      <el-button v-if="!isScore" size="large" :loading="draftSaving" @click="saveDraft">保存草稿</el-button>
       <el-button type="primary" size="large" :loading="submitting" @click="handleSubmit">提 交</el-button>
     </div>
 
@@ -128,11 +141,12 @@ import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTaskDetail } from '@/api/task'
-import { getTemplateFullDetail } from '@/api/template'
+import { getTemplateFullDetail, getTemplateDetail } from '@/api/template'
 import { getMyRecord, getRecordDetail, saveRecord, submitRecord, getCharCount } from '@/api/record'
 import { getAttachments, uploadAttachment, deleteAttachment } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
+import ScoreUploadForm from '@/components/ScoreUploadForm.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -157,8 +171,10 @@ const recordValues  = ref([])
 const currentRows   = ref([])
 const attachments   = ref([])
 
+const templateType = ref('form')   // 'form' | 'score'
+const isScore  = computed(() => templateType.value === 'score')
 const isMatrix = computed(() =>
-  templateItems.value.some(i => i.valueType === 'checkbox')
+  !isScore.value && templateItems.value.some(i => i.valueType === 'checkbox')
 )
 
 const canEdit = computed(() => {
@@ -181,13 +197,15 @@ onMounted(loadAll)
 async function loadAll() {
   loading.value = true
   try {
-    const [taskRes, fullRes] = await Promise.all([
+    const [taskRes, fullRes, tplRes] = await Promise.all([
       getTaskDetail(taskId),
-      getTemplateFullDetail(templateId)
+      getTemplateFullDetail(templateId),
+      getTemplateDetail(templateId).catch(() => null)
     ])
     taskDetail.value    = taskRes.data
     templateItems.value = fullRes.data.items || []
     templateRows.value  = fullRes.data.rows  || []
+    if (tplRes?.data?.templateType) templateType.value = tplRes.data.templateType
 
     try {
       const recRes = await getMyRecord(taskId)
@@ -249,7 +267,17 @@ async function saveDraft() {
 }
 
 async function handleSubmit() {
-  if (!isMatrix.value) {
+  if (isScore.value) {
+    // score 模式：检查所有 minAttachments > 0 的叶子是否达标
+    const missing = templateItems.value.filter(i =>
+      i.isLeaf === 1 && i.minAttachments > 0 &&
+      attachments.value.filter(a => String(a.itemId) === String(i.id)).length < i.minAttachments
+    )
+    if (missing.length) {
+      ElMessage.warning(`以下指标未满足最少上传数量：${missing.map(i => i.itemName).join('、')}`)
+      return
+    }
+  } else if (!isMatrix.value) {
     const missing = requireAttachLeaves.value.filter(l => {
       if (l.requireAttachment !== 1) return false
       return !attachments.value.some(a => a.itemId === l.id)
@@ -272,6 +300,19 @@ async function handleSubmit() {
     ElMessage.success('提交成功，等待审核')
     router.push('/org/record-list')
   } catch { /* interceptor already shows error toast (incl. 4032 字数超限) */ } finally { submitting.value = false }
+}
+
+// score 模式：ScoreUploadForm 需要 recordId 才能上传，先创建草稿
+async function handleNeedRecord({ file, itemId }) {
+  await saveDraft()
+  if (recordId.value) {
+    // 草稿创建完毕，重新触发上传
+    try {
+      const res = await uploadAttachment(recordId.value, itemId, file)
+      attachments.value.push(res.data)
+      ElMessage.success('上传成功')
+    } catch { /* interceptor handles */ }
+  }
 }
 
 async function uploadFile({ file }, itemId) {

@@ -10,6 +10,7 @@ export const submitRecord       = data   => request.post('/wr/record/submit', da
 export const auditRecord        = data   => request.post('/wr/record/audit', data)
 export const getCrossView       = params => request.get('/wr/record/admin/crossview', { params })
 export const getCharCount       = recordId => request.get(`/wr/record/charcount/${recordId}`)
+export const getRecordScore     = recordId => request.get(`/wr/record/score/${recordId}`)
 
 export const exportRecord       = taskId => {
   return request.get(`/wr/record/export/${taskId}`, { responseType: 'blob' })

@@ -70,10 +70,16 @@
         <el-form-item label="模板名称" prop="templateName">
           <el-input v-model="form.templateName" placeholder="请输入模板名称" />
         </el-form-item>
+        <el-form-item label="模板类型">
+          <el-radio-group v-model="form.templateType">
+            <el-radio value="form">表单录入（附件2）</el-radio>
+            <el-radio value="score">评分细则（纯上传）</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入描述" />
         </el-form-item>
-        <el-form-item label="字数限制">
+        <el-form-item v-if="form.templateType !== 'score'" label="字数限制">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <el-checkbox v-model="charLimitEnabled">启用总字数限制</el-checkbox>
             <template v-if="charLimitEnabled">
@@ -89,6 +95,7 @@
             </template>
           </div>
         </el-form-item>
+
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -114,7 +121,7 @@ const dialogVisible     = ref(false)
 const submitting        = ref(false)
 const editId            = ref(null)
 const formRef           = ref()
-const form              = reactive({ templateName: '', description: '' })
+const form              = reactive({ templateName: '', description: '', templateType: 'form' })
 const charLimitEnabled  = ref(false)
 const charLimitMax      = ref(1000)
 const rules = { templateName: [{ required: true, message: '请输入模板名称', trigger: 'blur' }] }
@@ -142,7 +149,7 @@ function resetQuery() {
 
 function openAddDialog() {
   editId.value = null
-  Object.assign(form, { templateName: '', description: '' })
+  Object.assign(form, { templateName: '', description: '', templateType: 'form' })
   charLimitEnabled.value = false
   charLimitMax.value = 1000
   dialogVisible.value = true
@@ -150,23 +157,24 @@ function openAddDialog() {
 
 async function openEditDialog(row) {
   editId.value = row.id
-  Object.assign(form, { templateName: row.templateName, description: row.description })
+  Object.assign(form, { templateName: row.templateName, description: row.description, templateType: 'form' })
   charLimitEnabled.value = false
   charLimitMax.value = 1000
   dialogVisible.value = true
-  // 拉取详情回显 maxTotalChars
+  // 拉取详情回显 maxTotalChars 和 templateType
   try {
     const res = await getTemplateDetail(row.id)
     const max = res.data?.maxTotalChars ?? 0
     charLimitEnabled.value = max > 0
     charLimitMax.value = max > 0 ? max : 1000
+    if (res.data?.templateType) form.templateType = res.data.templateType
   } catch { /* 不影响编辑流程 */ }
 }
 
 async function handleSubmit() {
   try { await formRef.value.validate() } catch { return }
   submitting.value = true
-  const maxTotalChars = charLimitEnabled.value ? (charLimitMax.value || 0) : 0
+  const maxTotalChars = (charLimitEnabled.value && form.templateType !== 'score') ? (charLimitMax.value || 0) : 0
   try {
     if (editId.value) {
       await updateTemplate({ id: editId.value, ...form, maxTotalChars })

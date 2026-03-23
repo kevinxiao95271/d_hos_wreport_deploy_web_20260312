@@ -20,14 +20,58 @@
           </el-descriptions>
         </el-card>
 
+        <!-- 评分汇总卡（score 模板专属） -->
+        <el-card v-if="isScore && scoreData" shadow="never" style="margin-top:12px">
+          <template #header>
+            <span>评分汇总</span>
+            <el-tag type="danger" size="small" style="margin-left:8px">评分细则</el-tag>
+          </template>
+          <div style="margin-bottom:12px">
+            <el-statistic title="得分 / 满分" :value="scoreData.totalScore" suffix="分">
+              <template #suffix> / {{ scoreData.maxScore }} 分</template>
+            </el-statistic>
+          </div>
+          <el-table :data="scoreData.items" border size="small">
+            <el-table-column prop="itemName" label="指标名称" min-width="180" />
+            <el-table-column label="上传数 / 要求" width="120" align="center">
+              <template #default="{ row }">
+                {{ row.uploaded }} / {{ row.minAttachments > 0 ? row.minAttachments + '+' : '不限' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="达标" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.reached ? 'success' : 'danger'" size="small">
+                  {{ row.reached ? '✓ 达标' : '✗ 未达标' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="分值" width="80" align="center">
+              <template #default="{ row }">
+                <span v-if="row.scoreValue > 0" :style="{ color: row.reached ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">
+                  {{ row.scoreValue }} 分
+                </span>
+                <span v-else style="color:#c0c4cc">—</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
         <!-- 填报数据卡 -->
         <el-card shadow="never" style="margin-top:12px">
           <template #header>
-            <span>填报数据</span>
-            <el-tag v-if="isMatrix" type="warning" size="small" style="margin-left:8px">勾选矩阵</el-tag>
+            <span>{{ isScore ? '上传文件' : '填报数据' }}</span>
+            <el-tag v-if="isScore"  type="danger"  size="small" style="margin-left:8px">评分细则</el-tag>
+            <el-tag v-else-if="isMatrix" type="warning" size="small" style="margin-left:8px">勾选矩阵</el-tag>
           </template>
+          <ScoreUploadForm
+            v-if="isScore"
+            :items="templateItems"
+            :attachments="attachments"
+            :record-id="recordId"
+            :editable="false"
+          />
           <CheckboxMatrixTable
-            v-if="isMatrix"
+            v-else-if="isMatrix"
             :items="templateItems"
             :rows="templateRows"
             :values="recordValues"
@@ -100,11 +144,12 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getRecordDetail, auditRecord } from '@/api/record'
-import { getTemplateFullDetail } from '@/api/template'
+import { getRecordDetail, auditRecord, getRecordScore } from '@/api/record'
+import { getTemplateFullDetail, getTemplateDetail } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
+import ScoreUploadForm from '@/components/ScoreUploadForm.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -117,6 +162,10 @@ const recordValues  = ref([])
 const templateItems = ref([])
 const templateRows  = ref([])
 const attachments   = ref([])
+const templateType  = ref('form')
+const scoreData     = ref(null)   // { totalScore, maxScore, items[] }
+
+const isScore = computed(() => templateType.value === 'score')
 
 function defaultDeadline() {
   const d = new Date()
@@ -165,12 +214,21 @@ async function loadAll() {
     templateRows.value = detail.rows   || []
     attachments.value  = attachRes.data || []
 
-    // detail.items 只含有值的列；补调 detail/full 拿全量 items（含 number 类型）
-    const fullRes = await getTemplateFullDetail(detail.record.templateId)
+    // 获取模板全量信息
+    const [fullRes, tplRes] = await Promise.all([
+      getTemplateFullDetail(detail.record.templateId),
+      getTemplateDetail(detail.record.templateId).catch(() => null)
+    ])
     templateItems.value = fullRes.data.items || []
-    // 若 rows 为空（record/detail 未返回），也从模板补充
-    if (!templateRows.value.length) {
-      templateRows.value = fullRes.data.rows || []
+    if (!templateRows.value.length) templateRows.value = fullRes.data.rows || []
+    if (tplRes?.data?.templateType) templateType.value = tplRes.data.templateType
+
+    // score 模板：加载评分汇总
+    if (templateType.value === 'score') {
+      try {
+        const scoreRes = await getRecordScore(recordId)
+        scoreData.value = scoreRes.data
+      } catch { /* ignore */ }
     }
   } finally { loading.value = false }
 }
