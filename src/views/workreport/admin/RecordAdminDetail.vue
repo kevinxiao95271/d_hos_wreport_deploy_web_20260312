@@ -63,12 +63,14 @@
             <el-tag v-if="isScore"  type="danger"  size="small" style="margin-left:8px">评分细则</el-tag>
             <el-tag v-else-if="isMatrix" type="warning" size="small" style="margin-left:8px">勾选矩阵</el-tag>
           </template>
-          <ScoreUploadForm
+          <DynamicHeaderTable
             v-if="isScore"
             :items="templateItems"
-            :attachments="attachments"
-            :record-id="recordId"
+            :values="recordValues"
             :editable="false"
+            template-type="score"
+            :record-id="recordId"
+            :attachments="attachments"
           />
           <CheckboxMatrixTable
             v-else-if="isMatrix"
