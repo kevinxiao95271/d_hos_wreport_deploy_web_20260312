@@ -77,6 +77,7 @@
                       <el-option label="日期 date"       value="date" />
                       <el-option label="下拉 select"     value="select" />
                       <el-option label="勾选 checkbox"   value="checkbox" />
+                      <el-option label="附件 attachment" value="attachment" />
                     </el-select>
                     <el-text v-if="activeNode.valueType === 'checkbox'" type="warning" size="small" style="margin-left:8px">
                       矩阵类型，需在「行定义」Tab 配置行数据
@@ -301,7 +302,7 @@ import {
   getTemplateRows,  saveTemplateRows
 } from '@/api/template'
 import { getDictTypes } from '@/api/dict'
-import { buildTree, getLeafNodes, getHeaderRows } from '@/utils/headerTree'
+import { getLeafNodes, getHeaderRows } from '@/utils/headerTree'
 
 const route  = useRoute()
 const router = useRouter()
@@ -349,17 +350,23 @@ onMounted(async () => {
     const res = await getTemplateItems(templateId)
     const items = res.data || []
     if (items.length) {
-      // id / parentId 统一转 String，保证与新节点的 "new_N" 类型一致
-      items.forEach(i => {
-        i.id       = i.id       != null ? String(i.id)       : null
-        i.parentId = i.parentId != null ? String(i.parentId) : null
-        i.tempId   = i.id || `t_${tempIdCounter++}`
-      })
-      treeData.value = buildTree(items)
+      processTree(items)     // 递归处理树（后端已返回嵌套结构）
+      treeData.value = items
     }
   } catch { /* empty template */ }
   await loadRows()
 })
+
+// 后端已返回嵌套树，递归赋 tempId 即可，不需要再 buildTree
+function processTree(nodes) {
+  ;(nodes || []).forEach(item => {
+    item.id       = item.id       != null ? String(item.id)       : null
+    item.parentId = item.parentId != null ? String(item.parentId) : null
+    item.tempId   = item.id || `t_${tempIdCounter++}`
+    if (!item.children) item.children = []
+    processTree(item.children)
+  })
+}
 
 function onNodeClick(data) { activeNode.value = data }
 
@@ -447,12 +454,8 @@ async function saveAllItems() {
     await saveTemplateItems(templateId, items)
     const res = await getTemplateItems(templateId)
     const loaded = res.data || []
-    loaded.forEach(i => {
-      i.id       = i.id       != null ? String(i.id)       : null
-      i.parentId = i.parentId != null ? String(i.parentId) : null
-      i.tempId   = i.id
-    })
-    treeData.value = buildTree(loaded)
+    processTree(loaded)
+    treeData.value = loaded
     activeNode.value = null
     ElMessage.success('列定义保存成功')
   } finally { savingItems.value = false }
