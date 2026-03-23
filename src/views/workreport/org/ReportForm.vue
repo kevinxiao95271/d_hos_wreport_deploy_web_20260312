@@ -94,7 +94,6 @@
             >下载格式模板</el-link>
           </div>
           <el-upload
-            v-if="recordId"
             multiple
             :http-request="(opts) => uploadFile(opts, leaf.id)"
             :file-list="attachFileList(leaf.id)"
@@ -110,7 +109,6 @@
         <div style="margin-top:16px">
           <div class="attach-label"><span>附件（可选）</span></div>
           <el-upload
-            v-if="recordId"
             multiple
             :http-request="(opts) => uploadFile(opts, null)"
             :file-list="attachFileList(null)"
@@ -118,7 +116,6 @@
           >
             <el-button size="small" plain>选择文件</el-button>
           </el-upload>
-          <el-text v-else type="info" size="small">保存草稿后可上传附件</el-text>
         </div>
       </template>
     </el-card>
