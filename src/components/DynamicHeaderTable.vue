@@ -16,7 +16,7 @@
         :label="headerLabel(leaf)"
         :prop="leaf.id"
         :min-width="colMinWidth(leaf)"
-        :align="isScore ? 'left' : colAlign(leaf)"
+        :align="leaf.valueType === 'attachment' ? 'left' : colAlign(leaf)"
       >
         <template #header>
           <el-tooltip :content="headerLabel(leaf)" placement="top" :disabled="!hasPath(leaf)">
@@ -24,8 +24,8 @@
               <div class="col-full-path" v-if="hasPath(leaf)">{{ headerLabel(leaf) }}</div>
               <div v-else>{{ leaf.itemName }}</div>
               <span v-if="leaf.unit && !isScore" class="unit-label">（{{ leaf.unit }}）</span>
-              <!-- score 模式：列头显示约束提示 -->
-              <div v-if="isScore" class="score-col-constraint">{{ scoreConstraintText(leaf) }}</div>
+              <!-- attachment 叶子：列头显示约束提示 -->
+              <div v-if="leaf.valueType === 'attachment'" class="score-col-constraint">{{ scoreConstraintText(leaf) }}</div>
               <span v-else-if="leaf.requireAttachment === 1" style="color:red"> *</span>
             </div>
           </el-tooltip>
@@ -33,8 +33,8 @@
 
         <template #default="{ row, $index }">
 
-          <!-- ══ SCORE 模式：上传格子 ══ -->
-          <template v-if="isScore">
+          <!-- ══ attachment 叶子：上传格子 ══ -->
+          <template v-if="leaf.valueType === 'attachment'">
             <div class="score-cell">
               <!-- 状态行 -->
               <div class="score-cell-top">
@@ -89,7 +89,7 @@
             </div>
           </template>
 
-          <!-- ══ FORM 模式：文本/下拉/日期格子 ══ -->
+          <!-- ══ 其他类型：文本/数字/下拉/日期格子 ══ -->
           <template v-else>
             <!-- 编辑模式 -->
             <template v-if="editable">
@@ -233,9 +233,13 @@ const props = defineProps({
 
 const emit = defineEmits(['update:rows', 'upload-file', 'delete-file', 'need-record'])
 
-const isScore = computed(() => props.templateType === 'score')
+// 任意叶子含 attachment 类型即为上传模式（不依赖 templateType 字段）
+const isScore = computed(() =>
+  props.templateType === 'score' ||
+  leafNodes.value.some(l => l.valueType === 'attachment')
+)
 
-// form 模式内联附件开关（attachments 不为 null 时激活）
+// form 模式内联附件：仅对非 attachment 叶子开启
 const inlineFormAttach = computed(() => !isScore.value && props.attachments !== null)
 
 const leafNodes = computed(() => getLeafNodes(props.items))
@@ -391,7 +395,7 @@ async function handleScoreDelete(attachId) {
 
 // ── 通用工具 ────────────────────────────────────────────
 function colMinWidth(leaf) {
-  if (isScore.value)                   return 180
+  if (leaf.valueType === 'attachment') return 180
   if (leaf.valueType === 'text')       return 220
   if (leaf.valueType === 'date')       return 150
   if (leaf.valueType === 'select' || leaf.dictCode) return 140

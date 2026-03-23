@@ -172,12 +172,8 @@ const attachments   = ref([])
 
 const templateType = ref('form')   // 'form' | 'score'
 const isScore = computed(() =>
-  // 显式字段优先；若后端未返回 templateType，则从 items 特征推断：
-  // 任意叶子节点有 minAttachments/maxAttachments/scoreValue 即视为 score 模板
   templateType.value === 'score' ||
-  templateItems.value.some(i =>
-    i.isLeaf === 1 && (i.minAttachments > 0 || i.maxAttachments > 0 || i.scoreValue > 0)
-  )
+  templateItems.value.some(i => i.isLeaf === 1 && i.valueType === 'attachment')
 )
 const isMatrix = computed(() =>
   !isScore.value && templateItems.value.some(i => i.valueType === 'checkbox')
@@ -195,7 +191,7 @@ const hasAttachLeaves = computed(() => requireAttachLeaves.value.length > 0)
 
 // score 进度
 const scoreLeaves = computed(() =>
-  isScore.value ? templateItems.value.filter(i => i.isLeaf === 1) : []
+  isScore.value ? templateItems.value.filter(i => i.isLeaf === 1 && i.valueType === 'attachment') : []
 )
 const scoreLeafCount = computed(() => scoreLeaves.value.length)
 const scoreReachedCount = computed(() =>
@@ -290,9 +286,9 @@ async function saveDraft() {
 
 async function handleSubmit() {
   if (isScore.value) {
-    // score 模式：检查所有 minAttachments > 0 的叶子是否达标
+    // score 模式：检查所有 attachment 叶子中 minAttachments > 0 的是否达标
     const missing = templateItems.value.filter(i =>
-      i.isLeaf === 1 && i.minAttachments > 0 &&
+      i.isLeaf === 1 && i.valueType === 'attachment' && i.minAttachments > 0 &&
       attachments.value.filter(a => String(a.itemId) === String(i.id)).length < i.minAttachments
     )
     if (missing.length) {

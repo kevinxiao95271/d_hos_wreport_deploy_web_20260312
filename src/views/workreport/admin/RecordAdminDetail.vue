@@ -167,9 +167,7 @@ const scoreData     = ref(null)   // { totalScore, maxScore, items[] }
 
 const isScore = computed(() =>
   templateType.value === 'score' ||
-  templateItems.value.some(i =>
-    i.isLeaf === 1 && (i.minAttachments > 0 || i.maxAttachments > 0 || i.scoreValue > 0)
-  )
+  templateItems.value.some(i => i.isLeaf === 1 && i.valueType === 'attachment')
 )
 
 function defaultDeadline() {
