@@ -46,22 +46,17 @@
         </span>
       </div>
 
-      <!-- 评分细则：卡片上传模式 -->
-      <ScoreUploadForm
-        v-if="isScore"
-        ref="scoreFormRef"
-        :items="templateItems"
-        :attachments="attachments"
-        :record-id="recordId"
-        :editable="canEdit"
-        @attachment-added="att => attachments.push(att)"
-        @attachment-removed="id => attachments = attachments.filter(a => a.id !== id)"
-        @need-record="handleNeedRecord"
-      />
+      <!-- 评分细则进度摘要 -->
+      <div v-if="isScore" class="score-progress-bar">
+        <span class="sp-label">上传进度：</span>
+        <span :class="scoreAllDone ? 'sp-ok' : 'sp-warn'">
+          {{ scoreReachedCount }} / {{ scoreLeafCount }} 项已达标
+        </span>
+      </div>
 
       <!-- 矩阵填报 -->
       <CheckboxMatrixTable
-        v-else-if="isMatrix"
+        v-if="isMatrix"
         :items="templateItems"
         :rows="templateRows"
         :values="recordValues"
@@ -69,17 +64,20 @@
         @update:rows="onRowsChange"
       />
 
-      <!-- 标准多级表头填报 -->
+      <!-- 标准多级表头 / 评分细则（均通过 DynamicHeaderTable 渲染） -->
       <DynamicHeaderTable
         v-else
         ref="tableRef"
         :items="templateItems"
         :values="recordValues"
         :editable="canEdit"
-        :attachments="hasAttachLeaves ? attachments : null"
+        :template-type="templateType"
+        :record-id="recordId"
+        :attachments="(isScore || hasAttachLeaves) ? attachments : null"
         @update:rows="onRowsChange"
-        @upload-file="(file, itemId) => uploadFile({ file }, itemId)"
-        @delete-file="removeAttachmentById"
+        @upload-file="onTableUpload"
+        @delete-file="onTableDelete"
+        @need-record="handleNeedRecord"
       />
 
       <!-- 格式模板下载提示（inline 附件已嵌入表格，仅保留格式模板入口） -->
@@ -115,7 +113,7 @@
     <div v-if="canEdit" class="bottom-bar">
       <el-button v-if="!isScore" size="large" :loading="draftSaving" @click="saveDraft">保存草稿</el-button>
       <el-tooltip
-        v-if="isScore && scoreFormRef && !scoreFormRef.canSubmit"
+        v-if="isScore && !scoreAllDone"
         content="请先完成所有必传指标"
         placement="top"
       >
@@ -148,17 +146,15 @@ import { getMyRecord, getRecordDetail, saveRecord, submitRecord, getCharCount } 
 import { getAttachments, uploadAttachment, deleteAttachment } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
-import ScoreUploadForm from '@/components/ScoreUploadForm.vue'
 
 const route  = useRoute()
 const router = useRouter()
 const taskId     = route.query.taskId
 const templateId = route.query.templateId
 
-const loading      = ref(true)
-const draftSaving  = ref(false)
-const submitting   = ref(false)
-const scoreFormRef = ref(null)
+const loading     = ref(true)
+const draftSaving = ref(false)
+const submitting  = ref(false)
 
 // 字数进度条
 const charLimit = reactive({ enabled: false, current: 0, max: 0 })
@@ -189,6 +185,21 @@ const requireAttachLeaves = computed(() =>
   templateItems.value.filter(i => i.isLeaf === 1 && i.requireAttachment > 0)
 )
 const hasAttachLeaves = computed(() => requireAttachLeaves.value.length > 0)
+
+// score 进度
+const scoreLeaves = computed(() =>
+  isScore.value ? templateItems.value.filter(i => i.isLeaf === 1) : []
+)
+const scoreLeafCount = computed(() => scoreLeaves.value.length)
+const scoreReachedCount = computed(() =>
+  scoreLeaves.value.filter(l => {
+    const cnt = attachments.value.filter(a => String(a.itemId) === String(l.id)).length
+    return !l.minAttachments || cnt >= l.minAttachments
+  }).length
+)
+const scoreAllDone = computed(() =>
+  scoreLeafCount.value > 0 && scoreReachedCount.value === scoreLeafCount.value
+)
 
 function attachFileList(itemId) {
   return attachments.value
@@ -346,6 +357,20 @@ async function removeAttachmentById(attachId) {
   } catch { ElMessage.error('删除失败') }
 }
 
+// DynamicHeaderTable score 模式事件：upload-file 传来的是 attachment 对象
+function onTableUpload(attOrFile, itemId) {
+  if (isScore.value) {
+    // score 模式：DynamicHeaderTable 内部已完成上传，传来的是 attachment 对象
+    attachments.value.push(attOrFile)
+  } else {
+    // form 模式内联附件：传来的是 (file, itemId)
+    uploadFile({ file: attOrFile }, itemId)
+  }
+}
+function onTableDelete(attachId) {
+  removeAttachmentById(attachId)
+}
+
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')
 
 function leafHeaderLabel(leaf) {
@@ -367,6 +392,20 @@ function leafHeaderLabel(leaf) {
   font-weight: 500;
   margin-bottom: 8px;
 }
+.score-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #f8f9fc;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  font-size: 13px;
+}
+.sp-label { color: #909399; }
+.sp-ok    { color: #67c23a; font-weight: 600; }
+.sp-warn  { color: #e6a23c; font-weight: 600; }
 .bottom-bar {
   position: sticky;
   bottom: 0;
