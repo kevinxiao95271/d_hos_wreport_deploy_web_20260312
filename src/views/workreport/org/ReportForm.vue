@@ -75,32 +75,22 @@
         :items="templateItems"
         :values="recordValues"
         :editable="canEdit"
+        :attachments="hasAttachLeaves ? attachments : null"
         @update:rows="onRowsChange"
+        @upload-file="(file, itemId) => uploadFile({ file }, itemId)"
+        @delete-file="removeAttachmentById"
       />
 
-      <!-- 附件上传区（非矩阵、非评分模板才有节点级附件） -->
-      <template v-if="canEdit && !isMatrix && !isScore">
-        <div v-for="leaf in requireAttachLeaves" :key="leaf.id" style="margin-top:16px">
-          <div class="attach-label">
-            <span>{{ leafHeaderLabel(leaf) }}</span>
-            <el-tag v-if="leaf.requireAttachment === 1" type="danger" size="small">必传</el-tag>
-            <el-tag v-else type="info" size="small">可选</el-tag>
-            <el-link
-              v-if="leaf.formatTemplateUrl"
-              type="primary"
-              :href="leaf.formatTemplateUrl"
-              target="_blank"
-              style="margin-left:8px;font-size:12px"
-            >下载格式模板</el-link>
-          </div>
-          <el-upload
-            multiple
-            :http-request="(opts) => uploadFile(opts, leaf.id)"
-            :file-list="attachFileList(leaf.id)"
-            :on-remove="(file) => removeAttachment(file, leaf.id)"
-          >
-            <el-button size="small" type="primary" plain>选择文件</el-button>
-          </el-upload>
+      <!-- 格式模板下载提示（inline 附件已嵌入表格，仅保留格式模板入口） -->
+      <template v-if="!isMatrix && !isScore">
+        <div
+          v-for="leaf in requireAttachLeaves.filter(l => l.formatTemplateUrl)"
+          :key="leaf.id"
+          style="margin-top:8px;font-size:12px;color:#666"
+        >
+          <el-link type="primary" :href="leaf.formatTemplateUrl" target="_blank">
+            下载格式模板：{{ leafHeaderLabel(leaf) }}
+          </el-link>
         </div>
       </template>
 
@@ -182,6 +172,7 @@ const canEdit = computed(() => {
 const requireAttachLeaves = computed(() =>
   templateItems.value.filter(i => i.isLeaf === 1 && i.requireAttachment > 0)
 )
+const hasAttachLeaves = computed(() => requireAttachLeaves.value.length > 0)
 
 function attachFileList(itemId) {
   return attachments.value
@@ -329,6 +320,13 @@ async function removeAttachment(file, itemId) {
   try {
     await deleteAttachment(att.id)
     attachments.value = attachments.value.filter(a => a.id !== att.id)
+  } catch { ElMessage.error('删除失败') }
+}
+
+async function removeAttachmentById(attachId) {
+  try {
+    await deleteAttachment(attachId)
+    attachments.value = attachments.value.filter(a => a.id !== attachId)
   } catch { ElMessage.error('删除失败') }
 }
 

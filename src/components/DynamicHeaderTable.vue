@@ -89,6 +89,43 @@
           <div v-else :class="leaf.valueType === 'text' ? 'cell-text-ro' : 'cell-val-ro'">
             {{ dictLabel(leaf, row[leaf.id]) }}
           </div>
+
+          <!-- 内联附件区（requireAttachment>0 且传入了 attachments prop 时显示） -->
+          <template v-if="inlineAttach && leaf.requireAttachment > 0 && $index === 0">
+            <div class="inline-attach">
+              <div
+                v-for="att in cellAttachments(leaf.id)"
+                :key="att.id"
+                class="inline-attach-row"
+              >
+                <el-icon size="13" color="#409eff"><Document /></el-icon>
+                <el-link :href="att.attachPath" target="_blank" type="primary" class="attach-name">
+                  {{ att.attachName }}
+                </el-link>
+                <el-button
+                  v-if="editable"
+                  type="danger" text size="small"
+                  style="padding:0 2px"
+                  @click="emit('delete-file', att.id)"
+                >删</el-button>
+              </div>
+              <el-upload
+                v-if="editable"
+                :show-file-list="false"
+                :http-request="(opts) => { emit('upload-file', opts.file, leaf.id); return Promise.resolve() }"
+                style="display:inline-block;margin-top:4px"
+              >
+                <el-button size="small" plain style="font-size:11px;padding:2px 8px">
+                  <el-icon><Upload /></el-icon> 上传
+                  <el-tag
+                    v-if="leaf.requireAttachment === 1"
+                    type="danger" size="small"
+                    style="margin-left:4px;transform:scale(.85)"
+                  >必传</el-tag>
+                </el-button>
+              </el-upload>
+            </div>
+          </template>
         </template>
       </el-table-column>
 
@@ -117,14 +154,17 @@
 import { computed, ref, watch } from 'vue'
 import { getLeafNodes, valuesToMap, getRowIndices } from '@/utils/headerTree'
 import { getDictItems } from '@/api/dict'
+import { Document, Upload } from '@element-plus/icons-vue'
 
 const props = defineProps({
-  items:    { type: Array, default: () => [] },
-  values:   { type: Array, default: () => [] },
-  editable: { type: Boolean, default: false }
+  items:       { type: Array,   default: () => [] },
+  values:      { type: Array,   default: () => [] },
+  editable:    { type: Boolean, default: false },
+  // 内联附件：传入时启用单元格内上传
+  attachments: { type: Array,   default: null }
 })
 
-const emit = defineEmits(['update:rows'])
+const emit = defineEmits(['update:rows', 'upload-file', 'delete-file'])
 
 const leafNodes = computed(() => getLeafNodes(props.items))
 
@@ -230,6 +270,15 @@ function headerLabel(leaf) {
 }
 
 // 是否有多级路径（超过1段才显示路径）
+// 内联附件：该叶子节点的已上传文件列表
+function cellAttachments(itemId) {
+  if (!props.attachments) return []
+  return props.attachments.filter(a => String(a.itemId) === String(itemId))
+}
+
+// 是否启用内联附件（props.attachments 不为 null）
+const inlineAttach = computed(() => props.attachments !== null)
+
 function hasPath(leaf) {
   const p = leaf.headerPath
   if (!p) return false
@@ -270,5 +319,24 @@ function hasPath(leaf) {
 /* 只读：数值/下拉等居中即可 */
 .cell-val-ro {
   line-height: 1.6;
+}
+/* 内联附件 */
+.inline-attach {
+  margin-top: 6px;
+  border-top: 1px dashed #e4e7ed;
+  padding-top: 6px;
+}
+.inline-attach-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.attach-name {
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
