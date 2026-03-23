@@ -88,6 +88,7 @@
         <!-- 附件区 -->
         <el-card v-if="attachments.length" shadow="never" style="margin-top:12px">
           <template #header><span>附件列表</span></template>
+          <PreviewDialog ref="previewRef" />
           <el-table :data="attachments" border size="small">
             <el-table-column prop="attachName" label="文件名" min-width="200" />
             <el-table-column label="所属节点" min-width="180">
@@ -101,9 +102,14 @@
                 </el-tooltip>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="80" align="center">
+            <el-table-column label="操作" width="130" align="center">
               <template #default="{ row }">
-                <el-link type="primary" :href="row.attachPath" target="_blank">下载</el-link>
+                <el-button
+                  v-if="canPreview(row.attachName)"
+                  type="primary" link size="small"
+                  @click="previewRef.show(row.attachPath, row.attachName)"
+                >预览</el-button>
+                <el-link type="default" :href="row.attachPath" target="_blank" style="margin-left:6px">下载</el-link>
               </template>
             </el-table-column>
           </el-table>
@@ -145,11 +151,13 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getRecordDetail, auditRecord, getRecordScore } from '@/api/record'
-import { getTemplateFullDetail, getTemplateDetail } from '@/api/template'
+import { getTemplateFullDetail } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
 import ScoreUploadForm from '@/components/ScoreUploadForm.vue'
+import PreviewDialog from '@/components/PreviewDialog.vue'
+import { getLeafNodesFromTree } from '@/utils/headerTree'
 
 const route  = useRoute()
 const router = useRouter()
@@ -162,12 +170,17 @@ const recordValues  = ref([])
 const templateItems = ref([])
 const templateRows  = ref([])
 const attachments   = ref([])
+const previewRef    = ref(null)
+const PREVIEW_EXTS  = ['jpg','jpeg','png','gif','webp','bmp','pdf']
+function canPreview(name) {
+  return PREVIEW_EXTS.includes((name || '').split('.').pop().toLowerCase())
+}
 const templateType  = ref('form')
 const scoreData     = ref(null)   // { totalScore, maxScore, items[] }
 
 const isScore = computed(() =>
   templateType.value === 'score' ||
-  templateItems.value.some(i => i.isLeaf === 1 && i.valueType === 'attachment')
+  getLeafNodesFromTree(templateItems.value).some(i => i.valueType === 'attachment')
 )
 
 function defaultDeadline() {
@@ -180,7 +193,7 @@ function defaultDeadline() {
 const auditForm = reactive({ auditResult: 1, auditRemark: '', resubmitDeadline: defaultDeadline() })
 
 const isMatrix = computed(() =>
-  templateItems.value.some(i => i.valueType === 'checkbox')
+  getLeafNodesFromTree(templateItems.value).some(i => i.valueType === 'checkbox')
 )
 
 // 附件节点显示：取最后两级，用 " / " 分隔；整体附件直接显示
@@ -217,14 +230,11 @@ async function loadAll() {
     templateRows.value = detail.rows   || []
     attachments.value  = attachRes.data || []
 
-    // 获取模板全量信息
-    const [fullRes, tplRes] = await Promise.all([
-      getTemplateFullDetail(detail.record.templateId),
-      getTemplateDetail(detail.record.templateId).catch(() => null)
-    ])
+    // 获取模板全量信息（templateType 已包含在 data.template 中）
+    const fullRes = await getTemplateFullDetail(detail.record.templateId)
     templateItems.value = fullRes.data.items || []
     if (!templateRows.value.length) templateRows.value = fullRes.data.rows || []
-    if (tplRes?.data?.templateType) templateType.value = tplRes.data.templateType
+    if (fullRes.data.template?.templateType) templateType.value = fullRes.data.template.templateType
 
     // score 模板：加载评分汇总
     if (templateType.value === 'score') {
@@ -259,5 +269,5 @@ async function doAudit(result) {
 }
 
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')
-const statusType  = s => ({ 0: 'info',  1: 'warning', 2: 'success', 3: 'danger' }[s] ?? '')
+const statusType  = s => ({ 0: 'info',  1: 'warning', 2: 'success', 3: 'danger' }[s] ?? 'info')
 </script>

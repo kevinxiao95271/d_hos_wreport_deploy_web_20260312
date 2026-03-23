@@ -168,6 +168,17 @@
                       <el-input-number v-model="activeNode.maxAttachments" :min="0" style="width:120px" />
                       <el-text type="info" size="small" style="margin-left:8px">0 = 不限制</el-text>
                     </el-form-item>
+                    <el-form-item label="允许格式">
+                      <el-input
+                        v-model="activeNode.allowedFormats"
+                        placeholder="如 pdf 或 pdf,doc,docx（逗号分隔，留空不限）"
+                        style="width:300px"
+                        clearable
+                      />
+                      <div style="font-size:12px;color:#909399;margin-top:4px">
+                        常用：pdf / pdf,doc,docx / jpg,jpeg,png,gif
+                      </div>
+                    </el-form-item>
                   </template>
                 </template>
                 <el-form-item label="排序号">
@@ -403,6 +414,7 @@ function newNode(parentTempId, sort) {
     scoreValue: 0,
     minAttachments: 0,
     maxAttachments: 0,
+    allowedFormats: null,
     formatTemplateName: null,
     formatTemplateUrl: null,
     children: []
@@ -485,7 +497,8 @@ function buildSavePayload(nodes, parentId, depth, colTracker) {
       sortNum:           node.sortNum || (idx + 1),
       scoreValue:        node.scoreValue ?? 0,
       minAttachments:    node.minAttachments ?? 0,
-      maxAttachments:    node.maxAttachments ?? 0
+      maxAttachments:    node.maxAttachments ?? 0,
+      allowedFormats:    node.allowedFormats || null
     }
     if (!hasChildren) colTracker.col++
     result.push(payload)

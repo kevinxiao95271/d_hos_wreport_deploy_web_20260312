@@ -14,7 +14,12 @@ request.interceptors.response.use(
   response => {
     const data = response.data
     if (data.code === 200) return data
-    ElMessage.error(data.message || '请求失败')
+    if (data.code === 401) {
+      localStorage.clear()
+      router.push('/login')
+    }
+    // 后端部分错误码使用 msg 字段而非 message，兼容两者
+    ElMessage.error(data.message || data.msg || '请求失败')
     return Promise.reject(new Error(data.message))
   },
   error => {

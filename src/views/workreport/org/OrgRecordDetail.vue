@@ -50,6 +50,7 @@
 
       <el-card v-if="attachments.length" shadow="never" style="margin-top:12px">
         <template #header><span>附件</span></template>
+        <PreviewDialog ref="previewRef" />
         <el-table :data="attachments" border size="small">
           <el-table-column prop="attachName" label="文件名" min-width="200" />
           <el-table-column label="所属节点" min-width="180">
@@ -63,9 +64,14 @@
               </el-tooltip>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="80" align="center">
+          <el-table-column label="操作" width="130" align="center">
             <template #default="{ row }">
-              <el-link type="primary" :href="row.attachPath" target="_blank">下载</el-link>
+              <el-button
+                v-if="canPreview(row.attachName)"
+                type="primary" link size="small"
+                @click="previewRef.show(row.attachPath, row.attachName)"
+              >预览</el-button>
+              <el-link type="default" :href="row.attachPath" target="_blank" style="margin-left:6px">下载</el-link>
             </template>
           </el-table-column>
         </el-table>
@@ -80,6 +86,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getRecordDetail } from '@/api/record'
 import { getTemplateFullDetail } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
+import PreviewDialog from '@/components/PreviewDialog.vue'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
 
@@ -93,6 +100,11 @@ const recordValues  = ref([])
 const templateItems = ref([])
 const templateRows  = ref([])
 const attachments   = ref([])
+const previewRef    = ref(null)
+const PREVIEW_EXTS  = ['jpg','jpeg','png','gif','webp','bmp','pdf']
+function canPreview(name) {
+  return PREVIEW_EXTS.includes((name || '').split('.').pop().toLowerCase())
+}
 
 const isMatrix = computed(() =>
   templateItems.value.some(i => i.valueType === 'checkbox')

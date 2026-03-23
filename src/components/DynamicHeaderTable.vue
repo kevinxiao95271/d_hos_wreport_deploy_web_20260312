@@ -1,5 +1,6 @@
 <template>
   <div class="dht-wrapper">
+    <PreviewDialog ref="previewRef" />
     <el-table
       :data="dataRows"
       border
@@ -42,10 +43,11 @@
 import { computed, ref, reactive, watch, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Document, Upload, Plus } from '@element-plus/icons-vue'
-import { buildTree, getLeafNodes, valuesToMap, getRowIndices } from '@/utils/headerTree'
+import { getLeafNodesFromTree, valuesToMap, getRowIndices } from '@/utils/headerTree'
 import { getDictItems } from '@/api/dict'
 import { uploadAttachment, deleteAttachment } from '@/api/attachment'
 import TableColumnGroup from './TableColumnGroup.vue'
+import PreviewDialog from './PreviewDialog.vue'
 
 const props = defineProps({
   items:        { type: Array,   default: () => [] },
@@ -59,19 +61,13 @@ const props = defineProps({
 
 const emit = defineEmits(['update:rows', 'upload-file', 'delete-file', 'need-record'])
 
-const leafNodes = computed(() => getLeafNodes(props.items))
+const previewRef = ref(null)
+function previewFile(url, name) { previewRef.value?.show(url, name) }
 
-// 树形列结构（用于递归渲染多级表头）
-const colTree = computed(() => {
-  const tree = buildTree(props.items)
-  // 按 sortNum → colIndex 排序每层
-  function sort(nodes) {
-    nodes.sort((a, b) => (a.sortNum ?? a.colIndex ?? 0) - (b.sortNum ?? b.colIndex ?? 0))
-    nodes.forEach(n => n.children && sort(n.children))
-  }
-  sort(tree)
-  return tree
-})
+const leafNodes = computed(() => getLeafNodesFromTree(props.items))
+
+// 后端已返回嵌套树，直接使用（无需再 buildTree）
+const colTree = computed(() => props.items)
 
 // 任意叶子含 attachment 类型即为上传模式（不依赖 templateType 字段）
 const isScore = computed(() =>
@@ -113,7 +109,7 @@ watch(
 
 function initRows() {
   if (!props.items.length) return
-  const leaves = getLeafNodes(props.items)
+  const leaves = getLeafNodesFromTree(props.items)
   const indices = getRowIndices(props.values)
   const vmap = valuesToMap(props.values)
   if (indices.length === 0) {
@@ -135,7 +131,7 @@ function makeEmptyRow(leaves) {
 }
 
 function addRow() {
-  const leaves = getLeafNodes(props.items)
+  const leaves = getLeafNodesFromTree(props.items)
   dataRows.value.push(makeEmptyRow(leaves))
   emitChange()
 }
@@ -149,7 +145,7 @@ function emitChange() {
   if (isScore.value) return
   const rows = dataRows.value.map((row, idx) => ({
     rowIndex: idx + 1,
-    cells: getLeafNodes(props.items).map(l => ({
+    cells: getLeafNodesFromTree(props.items).map(l => ({
       itemId: l.id,
       value: String(row[l.id] ?? '')
     }))
@@ -291,6 +287,7 @@ provide('dhtCtx', {
   onFormUploadFile,
   onFormDeleteFile,
   emitChange,
+  previewFile,
 })
 </script>
 

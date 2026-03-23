@@ -41,6 +41,8 @@
             </span>
           </div>
           <div v-if="node.placeholder" class="score-hint">{{ node.placeholder }}</div>
+          <!-- 格式 / 数量约束提示 -->
+          <div v-if="formatHint(node)" class="score-format-hint">{{ formatHint(node) }}</div>
           <div v-if="ctx.cellAttachments(node.id).length" class="score-chips">
             <div
               v-for="att in ctx.cellAttachments(node.id)"
@@ -48,13 +50,19 @@
               class="score-chip"
             >
               <el-icon size="12" color="#409eff"><Document /></el-icon>
+              <span class="chip-name" :title="att.attachName">{{ att.attachName }}</span>
+              <el-button
+                v-if="canPreview(att.attachName)"
+                type="primary" text size="small"
+                class="chip-action"
+                @click="ctx.previewFile(att.attachPath, att.attachName)"
+              >预览</el-button>
               <el-link
                 :href="att.attachPath"
                 target="_blank"
-                type="primary"
-                class="chip-name"
-                :title="att.attachName"
-              >{{ att.attachName }}</el-link>
+                type="default"
+                class="chip-action"
+              >下载</el-link>
               <el-button
                 v-if="ctx.editable.value"
                 type="danger" text size="small"
@@ -68,6 +76,7 @@
           <el-upload
             v-if="ctx.editable.value"
             :show-file-list="false"
+            :accept="toAccept(node.allowedFormats)"
             :disabled="ctx.scoreIsDisabled(node) || ctx.uploading[node.id]"
             :http-request="(opts) => ctx.handleScoreUpload(opts.file, node.id)"
             style="margin-top:6px"
@@ -197,6 +206,32 @@ import { Document, Upload } from '@element-plus/icons-vue'
 defineProps({ node: { type: Object, required: true } })
 
 const ctx = inject('dhtCtx')
+
+const PREVIEW_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'pdf']
+function canPreview(name) {
+  return PREVIEW_EXTS.includes((name || '').split('.').pop().toLowerCase())
+}
+
+function toAccept(allowedFormats) {
+  if (!allowedFormats) return '*'
+  return allowedFormats.split(',').map(ext => `.${ext.trim()}`).join(',')
+}
+
+function formatHint(node) {
+  const parts = []
+  if (node.allowedFormats) {
+    parts.push(`格式：${node.allowedFormats.toUpperCase().replace(/,/g, ' / ')}`)
+  }
+  const min = node.minAttachments || 0
+  const max = node.maxAttachments || 0
+  if (min > 0 && max > 0 && min === max) {
+    parts.push(`需 ${min} 个`)
+  } else {
+    if (min > 0) parts.push(`至少 ${min} 个`)
+    if (max > 0) parts.push(`最多 ${max} 个`)
+  }
+  return parts.join('，')
+}
 </script>
 
 <style scoped>
@@ -211,7 +246,8 @@ const ctx = inject('dhtCtx')
 .badge-fail { color: #f56c6c; background: #fef0f0; }
 .badge-none { color: #909399; background: #f5f5f5; }
 
-.score-hint  { font-size: 11px; color: #c0c4cc; margin-bottom: 6px; line-height: 1.4; }
+.score-hint        { font-size: 11px; color: #c0c4cc; margin-bottom: 4px; line-height: 1.4; }
+.score-format-hint { font-size: 11px; color: #909399; margin-bottom: 6px; line-height: 1.4; }
 .score-empty { font-size: 12px; color: #c0c4cc; margin: 4px 0; }
 
 .score-chips { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
@@ -222,9 +258,10 @@ const ctx = inject('dhtCtx')
 }
 .chip-name {
   flex: 1; font-size: 12px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;
 }
-.chip-del { padding: 0 2px; font-size: 11px; flex-shrink: 0; }
+.chip-action { padding: 0 3px; font-size: 11px; flex-shrink: 0; }
+.chip-del    { padding: 0 2px; font-size: 11px; flex-shrink: 0; }
 
 .cell-text-ro { white-space: pre-wrap; word-break: break-word; line-height: 1.6; text-align: left; min-height: 44px; }
 .cell-val-ro  { line-height: 1.6; }

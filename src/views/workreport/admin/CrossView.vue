@@ -230,6 +230,7 @@ import { Select, Filter } from '@element-plus/icons-vue'
 import { getTaskPage } from '@/api/task'
 import { getTemplateFullDetail, getTemplateRows } from '@/api/template'
 import { getCrossView } from '@/api/record'
+import { getLeafNodesFromTree } from '@/utils/headerTree'
 
 const router = useRouter()
 
@@ -403,16 +404,18 @@ async function onTaskChange() {
   try {
     // 一次调用拿到 items + rows（与 ReportForm.vue 保持一致）
     const fullRes = await getTemplateFullDetail(tid)
-    const allItems = fullRes.data?.items || []
-    const allRowDefs = fullRes.data?.rows || []
+    const allItems   = fullRes.data?.items || []
+    const allRowDefs = fullRes.data?.rows  || []
 
-    // 用 checkbox 类型判断模板类型（与 ReportForm.vue isMatrix 逻辑一致）
-    const isMatrixType = allItems.some(i => i.valueType === 'checkbox')
+    // 优先用 data.template.templateType；后备用叶子 checkbox 检测
+    const tplType    = fullRes.data?.template?.templateType
+    const allLeafItems = getLeafNodesFromTree(allItems)
+    const isMatrixType = tplType === 'matrix' || (!tplType && allLeafItems.some(i => i.valueType === 'checkbox'))
     templateType.value = isMatrixType ? 'matrix' : 'standard'
 
     if (!isMatrixType) {
       // 标准模板：取叶子节点，还原记忆或默认前 5
-      const leaves   = allItems.filter(i => i.isLeaf === 1)
+      const leaves   = allLeafItems
       allLeaves.value = leaves
       const validIds = leaves.map(l => l.id)
       const saved    = loadSaved(itemKey(filter.value.taskId))

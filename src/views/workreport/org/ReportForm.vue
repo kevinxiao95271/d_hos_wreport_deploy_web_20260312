@@ -141,11 +141,12 @@ import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getActiveTasks } from '@/api/task'
-import { getTemplateFullDetail, getTemplateDetail } from '@/api/template'
+import { getTemplateFullDetail } from '@/api/template'
 import { getMyRecord, getRecordDetail, saveRecord, submitRecord, getCharCount } from '@/api/record'
 import { getAttachments, uploadAttachment, deleteAttachment } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
 import CheckboxMatrixTable from '@/components/CheckboxMatrixTable.vue'
+import { getLeafNodesFromTree } from '@/utils/headerTree'
 
 const route  = useRoute()
 const router = useRouter()
@@ -173,10 +174,10 @@ const attachments   = ref([])
 const templateType = ref('form')   // 'form' | 'score'
 const isScore = computed(() =>
   templateType.value === 'score' ||
-  templateItems.value.some(i => i.isLeaf === 1 && i.valueType === 'attachment')
+  getLeafNodesFromTree(templateItems.value).some(i => i.valueType === 'attachment')
 )
 const isMatrix = computed(() =>
-  !isScore.value && templateItems.value.some(i => i.valueType === 'checkbox')
+  !isScore.value && getLeafNodesFromTree(templateItems.value).some(i => i.valueType === 'checkbox')
 )
 
 const canEdit = computed(() => {
@@ -185,13 +186,13 @@ const canEdit = computed(() => {
 })
 
 const requireAttachLeaves = computed(() =>
-  templateItems.value.filter(i => i.isLeaf === 1 && i.requireAttachment > 0)
+  getLeafNodesFromTree(templateItems.value).filter(i => i.requireAttachment > 0)
 )
 const hasAttachLeaves = computed(() => requireAttachLeaves.value.length > 0)
 
 // score 进度
 const scoreLeaves = computed(() =>
-  isScore.value ? templateItems.value.filter(i => i.isLeaf === 1 && i.valueType === 'attachment') : []
+  isScore.value ? getLeafNodesFromTree(templateItems.value).filter(i => i.valueType === 'attachment') : []
 )
 const scoreLeafCount = computed(() => scoreLeaves.value.length)
 const scoreReachedCount = computed(() =>
@@ -215,15 +216,14 @@ onMounted(loadAll)
 async function loadAll() {
   loading.value = true
   try {
-    const [taskListRes, fullRes, tplRes] = await Promise.all([
+    const [taskListRes, fullRes] = await Promise.all([
       getActiveTasks(),
       getTemplateFullDetail(templateId),
-      getTemplateDetail(templateId).catch(() => null)
     ])
     taskDetail.value    = (taskListRes.data || []).find(t => String(t.id) === String(taskId)) || {}
     templateItems.value = fullRes.data.items || []
     templateRows.value  = fullRes.data.rows  || []
-    if (tplRes?.data?.templateType) templateType.value = tplRes.data.templateType
+    if (fullRes.data.template?.templateType) templateType.value = fullRes.data.template.templateType
 
     try {
       const recRes = await getMyRecord(taskId)
@@ -287,8 +287,8 @@ async function saveDraft() {
 async function handleSubmit() {
   if (isScore.value) {
     // score 模式：检查所有 attachment 叶子中 minAttachments > 0 的是否达标
-    const missing = templateItems.value.filter(i =>
-      i.isLeaf === 1 && i.valueType === 'attachment' && i.minAttachments > 0 &&
+    const missing = getLeafNodesFromTree(templateItems.value).filter(i =>
+      i.valueType === 'attachment' && i.minAttachments > 0 &&
       attachments.value.filter(a => String(a.itemId) === String(i.id)).length < i.minAttachments
     )
     if (missing.length) {

@@ -13,9 +13,26 @@ export function buildTree(items) {
   return roots
 }
 
-/** Get all leaf nodes (isLeaf === 1) sorted by colIndex */
+/** Get all leaf nodes (isLeaf === 1) from a FLAT list, sorted by colIndex */
 export function getLeafNodes(items) {
   return items.filter(i => i.isLeaf === 1).sort((a, b) => a.colIndex - b.colIndex)
+}
+
+/** Get all leaf nodes (isLeaf === 1) from a NESTED tree via recursive traversal */
+export function getLeafNodesFromTree(roots) {
+  const leaves = []
+  function traverse(nodes) {
+    ;(nodes || []).forEach(item => {
+      if (item.children && item.children.length) {
+        traverse(item.children)
+      }
+      if (item.isLeaf === 1) {
+        leaves.push(item)
+      }
+    })
+  }
+  traverse(roots)
+  return leaves
 }
 
 /** Group items by headerRow, sort each group by colIndex */
