@@ -31,25 +31,47 @@
               <template #suffix> / {{ scoreData.maxScore }} 分</template>
             </el-statistic>
           </div>
-          <el-table :data="scoreData.items" border size="small">
-            <el-table-column prop="itemName" label="指标名称" min-width="180" />
-            <el-table-column label="上传数 / 要求" width="120" align="center">
+          <el-table
+            :data="tableScoreRows"
+            border size="small"
+            :row-class-name="({ row }) => row._isGroup ? 'score-group-row' : ''"
+          >
+            <el-table-column label="指标名称" min-width="200">
               <template #default="{ row }">
-                {{ row.uploaded }} / {{ row.minAttachments > 0 ? row.minAttachments + '+' : '不限' }}
+                <!-- 分组标题行 -->
+                <span v-if="row._isGroup" class="score-group-name">{{ row._name }}</span>
+                <!-- 叶子明细行（缩进显示） -->
+                <span v-else style="padding-left:16px">{{ scoreItemPath(row) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="达标" width="80" align="center">
+            <el-table-column label="上传数 / 要求" width="120" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.reached ? 'success' : 'danger'" size="small">
-                  {{ row.reached ? '✓ 达标' : '✗ 未达标' }}
+                <span v-if="row._isGroup" style="color:#909399">—</span>
+                <span v-else>{{ row.uploaded }} / {{ row.minAttachments > 0 ? row.minAttachments + '+' : '不限' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="达标" width="90" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row._isGroup ? (row._reached ? 'success' : 'danger') : (row.reached ? 'success' : 'danger')"
+                  size="small"
+                >
+                  {{ row._isGroup ? (row._reached ? '✓ 全部达标' : '✗ 未完成') : (row.reached ? '✓' : '✗') }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="分值" width="80" align="center">
               <template #default="{ row }">
-                <span v-if="row.scoreValue > 0" :style="{ color: row.reached ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }">
-                  {{ row.scoreValue }} 分
-                </span>
+                <!-- 分组行：显示该组的分值 -->
+                <span
+                  v-if="row._isGroup && row._score > 0"
+                  :style="{ color: row._reached ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }"
+                >{{ row._score }} 分</span>
+                <!-- 叶子行且自身有分值（如 培训） -->
+                <span
+                  v-else-if="!row._isGroup && row.scoreValue > 0"
+                  :style="{ color: row.reached ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }"
+                >{{ row.scoreValue }} 分</span>
                 <span v-else style="color:#c0c4cc">—</span>
               </template>
             </el-table-column>
@@ -185,6 +207,78 @@ const isScore = computed(() =>
   getLeafNodesFromTree(templateItems.value).some(i => i.valueType === 'attachment')
 )
 
+// 评分汇总：用 templateItems 里的 headerPath 补全父节点路径
+function scoreItemPath(scoreItem) {
+  const leaf = getLeafNodesFromTree(templateItems.value)
+    .find(i => String(i.id) === String(scoreItem.itemId))
+  if (!leaf) return scoreItem.itemName
+  const path = leaf.headerPath
+  if (!path || !Array.isArray(path) || path.length <= 1) return scoreItem.itemName
+  return path.slice(-2).join(' / ')
+}
+
+// 在树中按 id 查找节点（含子节点）
+function findNodeById(nodes, id) {
+  for (const node of nodes) {
+    if (String(node.id) === id) return node
+    if (node.children?.length) {
+      const found = findNodeById(node.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// 带分组行的评分表格数据：父节点作为标题行，叶子作为明细行
+const tableScoreRows = computed(() => {
+  if (!scoreData.value?.items?.length) return []
+
+  const allLeaves  = getLeafNodesFromTree(templateItems.value)
+  const itemMap    = Object.fromEntries(
+    scoreData.value.items.map(it => [String(it.itemId), it])
+  )
+  // 按 DFS 顺序取叶子
+  const orderedLeaves = allLeaves.filter(l => itemMap[String(l.id)])
+
+  const result     = []
+  let lastParentId = '__none__'
+
+  orderedLeaves.forEach(leaf => {
+    const parentId = leaf.parentId ? String(leaf.parentId) : null
+    const groupKey = parentId || `root_${leaf.id}`
+
+    if (groupKey !== lastParentId && parentId) {
+      // 找父节点
+      const parent = findNodeById(templateItems.value, parentId)
+      if (parent) {
+        // 判断整组是否全部达标
+        const groupLeafIds = getLeafNodesFromTree([parent]).map(l => String(l.id))
+        const groupReached = groupLeafIds.every(id => itemMap[id]?.reached)
+        result.push({
+          _isGroup:   true,
+          _name:      parent.itemName,
+          _score:     parent.scoreValue || 0,
+          _reached:   groupReached
+        })
+      }
+      lastParentId = groupKey
+    } else if (!parentId && groupKey !== lastParentId) {
+      lastParentId = groupKey
+    }
+
+    result.push({ ...itemMap[String(leaf.id)], _isGroup: false, _leaf: leaf })
+  })
+
+  // 追加 templateItems 里找不到的条目
+  const handledIds = new Set(orderedLeaves.map(l => String(l.id)))
+  scoreData.value.items.forEach(it => {
+    if (!handledIds.has(String(it.itemId))) {
+      result.push({ ...it, _isGroup: false, _leaf: null })
+    }
+  })
+  return result
+})
+
 function defaultDeadline() {
   const d = new Date()
   d.setDate(d.getDate() + 7)
@@ -273,3 +367,10 @@ async function doAudit(result) {
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')
 const statusType  = s => ({ 0: 'info',  1: 'warning', 2: 'success', 3: 'danger' }[s] ?? 'info')
 </script>
+
+<style>
+/* 评分汇总分组标题行背景 */
+.score-group-row { background-color: #f0f4f8 !important; }
+.score-group-row td { background-color: #f0f4f8 !important; }
+.score-group-name { font-weight: 600; color: #303133; }
+</style>
