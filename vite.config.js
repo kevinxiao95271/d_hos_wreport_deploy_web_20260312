@@ -11,7 +11,8 @@ export default defineConfig({
     port: 8089,
     proxy: {
       '/api': { target: 'http://localhost:8083', changeOrigin: true },
-      '/wr':  { target: 'http://localhost:8083', changeOrigin: true }
+      '/wr':  { target: 'http://localhost:8083', changeOrigin: true },
+      '/dw':  { target: 'http://localhost:8083', changeOrigin: true }
     }
   }
 })

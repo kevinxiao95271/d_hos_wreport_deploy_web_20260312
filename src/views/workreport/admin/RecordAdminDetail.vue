@@ -34,13 +34,15 @@
           <el-table
             :data="tableScoreRows"
             border size="small"
-            :row-class-name="({ row }) => row._isGroup ? 'score-group-row' : ''"
+            :row-class-name="({ row }) => (row._isGroup || row._isScoredLeaf) ? 'score-group-row' : ''"
           >
             <el-table-column label="指标名称" min-width="200">
               <template #default="{ row }">
                 <!-- 分组标题行 -->
                 <span v-if="row._isGroup" class="score-group-name">{{ row._name }}</span>
-                <!-- 叶子明细行（缩进显示） -->
+                <!-- 自带分值的独立叶子（如"培训"）：同等加粗 -->
+                <span v-else-if="row._isScoredLeaf" class="score-group-name">{{ scoreItemPath(row) }}</span>
+                <!-- 普通叶子明细行（缩进显示） -->
                 <span v-else style="padding-left:16px">{{ scoreItemPath(row) }}</span>
               </template>
             </el-table-column>
@@ -56,11 +58,11 @@
                   :type="row._isGroup ? (row._reached ? 'success' : 'danger') : (row.reached ? 'success' : 'danger')"
                   size="small"
                 >
-                  {{ row._isGroup ? (row._reached ? '✓ 全部达标' : '✗ 未完成') : (row.reached ? '✓' : '✗') }}
+                  {{ row._isGroup ? (row._reached ? '✓ 全部达标' : '✗ 未完成') : (row.reached ? '✓ 达标' : '✗ 未达标') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="分值" width="80" align="center">
+            <el-table-column label="自评得分" width="90" align="center">
               <template #default="{ row }">
                 <!-- 分组行：显示该组的分值 -->
                 <span
@@ -73,6 +75,33 @@
                   :style="{ color: row.reached ? '#67c23a' : '#f56c6c', fontWeight: 'bold' }"
                 >{{ row.scoreValue }} 分</span>
                 <span v-else style="color:#c0c4cc">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="实际得分" width="110" align="center">
+              <template #default="{ row }">
+                <el-input-number
+                  v-if="row._isGroup || row._isScoredLeaf"
+                  v-model="adminScores[row._isGroup ? ('g_' + row._name) : String(row.itemId)]"
+                  :min="0"
+                  :max="row._isGroup ? row._score : row.scoreValue"
+                  :precision="1"
+                  :step="0.5"
+                  size="small"
+                  style="width:90px"
+                  placeholder="—"
+                />
+                <span v-else style="color:#c0c4cc">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="160">
+              <template #default="{ row }">
+                <el-input
+                  v-if="row._isGroup || row._isScoredLeaf"
+                  v-model="adminRemarks[row._isGroup ? ('g_' + row._name) : String(row.itemId)]"
+                  size="small"
+                  placeholder="调整原因（选填）"
+                  clearable
+                />
               </template>
             </el-table-column>
           </el-table>
@@ -111,7 +140,18 @@
 
         <!-- 附件区 -->
         <el-card v-if="attachments.length" shadow="never" style="margin-top:12px">
-          <template #header><span>附件列表</span></template>
+          <template #header>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span>附件列表</span>
+              <el-button
+                type="primary" size="small" plain
+                :loading="zipping"
+                @click="downloadZip"
+              >
+                <el-icon><Download /></el-icon> 打包下载
+              </el-button>
+            </div>
+          </template>
           <PreviewDialog ref="previewRef" />
           <el-table :data="attachments" border size="small">
             <el-table-column prop="attachName" label="文件名" min-width="200" />
@@ -174,6 +214,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Check, Close, Download } from '@element-plus/icons-vue'
 import { getRecordDetail, auditRecord, getRecordScore } from '@/api/record'
 import { getTemplateFullDetail } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
@@ -189,6 +230,10 @@ const recordId = route.query.recordId
 
 const loading  = ref(true)
 const auditing = ref(false)
+const zipping  = ref(false)
+// 管理端实际得分 & 备注（key: itemId 或 'g_父节点名'，本地暂存，等后端接口就绪再同步）
+const adminScores  = reactive({})
+const adminRemarks = reactive({})
 const record   = ref({})
 const recordValues  = ref([])
 const templateItems = ref([])
@@ -266,14 +311,16 @@ const tableScoreRows = computed(() => {
       lastParentId = groupKey
     }
 
-    result.push({ ...itemMap[String(leaf.id)], _isGroup: false, _leaf: leaf })
+    const scoreItem = itemMap[String(leaf.id)]
+    // 自身带分值的叶子（如"培训"）：打 _isScoredLeaf 标记，让模板赋予同等粗体样式
+    result.push({ ...scoreItem, _isGroup: false, _isScoredLeaf: (scoreItem.scoreValue > 0), _leaf: leaf })
   })
 
   // 追加 templateItems 里找不到的条目
   const handledIds = new Set(orderedLeaves.map(l => String(l.id)))
   scoreData.value.items.forEach(it => {
     if (!handledIds.has(String(it.itemId))) {
-      result.push({ ...it, _isGroup: false, _leaf: null })
+      result.push({ ...it, _isGroup: false, _isScoredLeaf: false, _leaf: null })
     }
   })
   return result
@@ -340,6 +387,37 @@ async function loadAll() {
       } catch { /* ignore */ }
     }
   } finally { loading.value = false }
+}
+
+async function downloadZip() {
+  zipping.value = true
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch(`/wr/attachment/download/zip/${recordId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) {
+      let msg = '下载失败'
+      try { const err = await res.json(); msg = err.msg || err.message || msg } catch { /* ignore */ }
+      ElMessage.error(msg)
+      return
+    }
+    const disposition = res.headers.get('Content-Disposition') || ''
+    const match = disposition.match(/filename\*=UTF-8''(.+)/)
+               ?? disposition.match(/filename="(.+)"/)
+    const fileName = match
+      ? decodeURIComponent(match[1])
+      : `attachments_${recordId}.zip`
+    const blob = await res.blob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = fileName; a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('下载异常：' + e.message)
+  } finally {
+    zipping.value = false
+  }
 }
 
 async function doAudit(result) {

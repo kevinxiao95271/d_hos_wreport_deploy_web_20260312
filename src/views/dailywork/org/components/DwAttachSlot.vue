@@ -1,0 +1,143 @@
+<!-- 单个 slot 的附件上传 + 预览组件 -->
+<template>
+  <div class="attach-slot">
+    <div v-if="label" class="slot-label">{{ label }}</div>
+    <div class="file-list">
+      <div
+        v-for="file in files"
+        :key="file.id"
+        class="file-chip"
+      >
+        <el-icon class="chip-icon"><Document /></el-icon>
+        <span class="chip-name" :title="file.fileName">{{ file.fileName }}</span>
+        <div class="chip-actions">
+          <el-button
+            v-if="canPreview(file.fileName)"
+            type="primary" link size="small"
+            @click="$emit('preview', file.fileUrl, file.fileName)"
+          >预览</el-button>
+          <el-button
+            type="primary" link size="small"
+            tag="a" :href="file.fileUrl" target="_blank"
+          >下载</el-button>
+          <el-button
+            v-if="editable"
+            type="danger" link size="small"
+            :loading="deletingId === file.id"
+            @click="handleDelete(file)"
+          >删除</el-button>
+        </div>
+      </div>
+    </div>
+    <el-upload
+      v-if="editable"
+      :show-file-list="false"
+      :before-upload="() => false"
+      :on-change="handleChange"
+      :accept="accept"
+      drag
+      class="slot-upload"
+    >
+      <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+      <div class="el-upload__text">拖拽或 <em>点击上传</em></div>
+      <template #tip>
+        <div v-if="formatHint" class="format-hint">{{ formatHint }}</div>
+        <div v-else-if="hint" class="upload-hint">{{ hint }}</div>
+      </template>
+    </el-upload>
+    <div v-if="uploading" class="upload-progress">
+      <el-icon class="is-loading"><Loading /></el-icon> 上传中…
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Document, UploadFilled, Loading } from '@element-plus/icons-vue'
+import { uploadDwAttachment, deleteDwAttachment } from '@/api/dailywork'
+
+const props = defineProps({
+  files:       { type: Array,   default: () => [] },
+  recordId:    { type: [String, Number], required: true },
+  moduleType:  { type: String, required: true },
+  slot_:       { type: String, required: true },    // 'slot' is reserved word
+  subRecordId: { type: [String, Number], default: null },
+  editable:    { type: Boolean, default: true },
+  hint:        { type: String, default: '' },       // 整体模块上传提示（来自 moduleConfig）
+  label:       { type: String, default: '' },       // 当前 slot 名称
+  accept:      { type: String, default: '' },       // 文件格式限制，如 ".pdf,.docx"
+  formatHint:  { type: String, default: '' },       // 显示给用户的格式说明
+})
+const emit = defineEmits(['uploaded', 'deleted', 'preview'])
+
+const uploading  = ref(false)
+const deletingId = ref(null)
+
+const IMAGE_EXTS  = ['jpg','jpeg','png','gif','webp','bmp','svg']
+const PDF_EXTS    = ['pdf']
+const DOCX_EXTS   = ['docx','doc']
+function ext(name) { return (name || '').split('.').pop().toLowerCase() }
+function canPreview(name) {
+  const e = ext(name)
+  return IMAGE_EXTS.includes(e) || PDF_EXTS.includes(e) || DOCX_EXTS.includes(e)
+}
+
+async function handleChange(file) {
+  uploading.value = true
+  try {
+    await uploadDwAttachment(props.recordId, props.moduleType, props.slot_, file.raw, props.subRecordId)
+    emit('uploaded')
+  } catch (e) {
+    ElMessage.error(e.message || '上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function handleDelete(file) {
+  deletingId.value = file.id
+  try {
+    await deleteDwAttachment(file.id)
+    emit('deleted')
+  } catch (e) {
+    ElMessage.error(e.message || '删除失败')
+  } finally {
+    deletingId.value = null
+  }
+}
+</script>
+
+<style scoped>
+.attach-slot { margin-bottom: 8px; }
+.slot-label  { font-size: 13px; color: #606266; margin-bottom: 6px; font-weight: 500; }
+.file-list   { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f4f4f5;
+  border: 1px solid #e9e9eb;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  max-width: 380px;
+}
+.chip-icon   { color: #909399; flex-shrink: 0; }
+.chip-name   { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.slot-upload :deep(.el-upload-dragger) {
+  padding: 12px 20px;
+  height: auto;
+}
+.format-hint { font-size: 12px; color: #409eff; margin-top: 4px; }
+.upload-hint { font-size: 12px; color: #909399; margin-top: 4px; }
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #409eff;
+  font-size: 13px;
+  margin-top: 4px;
+}
+</style>

@@ -183,10 +183,10 @@ function scoreBadgeClass(leaf) {
 function scoreBadgeText(leaf) {
   const cnt = scoreUploadedCount(leaf)
   const min = leaf.minAttachments || 0
-  if (!min) return cnt > 0 ? `✓ ${cnt} 个` : '可选'
+  if (!min) return cnt > 0 ? `✓ 已上传 ${cnt} 个` : '可选'
   if (cnt === 0)    return '✗ 未上传'
   if (cnt < min)    return `⚠ 还需 ${min - cnt} 个`
-  return `✓ ${cnt} 个`
+  return `✓ 已上传 ${cnt} 个`
 }
 
 function scoreConstraintText(leaf) {

@@ -32,8 +32,11 @@
 
       <el-table :data="list" border stripe v-loading="loading">
         <el-table-column prop="taskName" label="任务名称" min-width="200" />
-        <el-table-column label="关联模板" min-width="160">
-          <template #default="{ row }">{{ templateMap[row.templateId] || row.templateId }}</template>
+        <el-table-column label="类型/模板" min-width="160">
+          <template #default="{ row }">
+            <el-tag v-if="row.taskType === 'daily_work'" type="success" size="small">日常工作</el-tag>
+            <span v-else>{{ templateMap[row.templateId] || row.templateId || '—' }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="statYear" label="统计年度" width="100" align="center" />
         <el-table-column prop="deadline" label="截止日期" width="160" />
@@ -69,13 +72,23 @@
     <!-- 新建/编辑抽屉 -->
     <el-drawer v-model="drawerVisible" :title="editData ? '编辑任务' : '新建任务'" size="480px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="任务类型">
+          <el-radio-group v-model="form.taskType" :disabled="!!editData">
+            <el-radio label="normal">普通模板上报</el-radio>
+            <el-radio label="daily_work">日常工作填报</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="任务名称" prop="taskName">
           <el-input v-model="form.taskName" placeholder="请输入任务名称" />
         </el-form-item>
-        <el-form-item label="关联模板" prop="templateId">
+        <el-form-item v-if="form.taskType === 'normal'" label="关联模板" prop="templateId">
           <el-select v-model="form.templateId" placeholder="请选择模板" style="width:100%">
             <el-option v-for="t in templateList" :key="t.id" :label="t.templateName" :value="t.id" />
           </el-select>
+        </el-form-item>
+        <el-form-item v-if="form.taskType === 'daily_work'" label="">
+          <el-alert type="info" :closable="false" show-icon
+            title="日常工作任务使用内置固定模块，无需选择模板" style="padding:6px 12px" />
         </el-form-item>
         <el-form-item label="统计年度">
           <el-date-picker v-model="form.statYear" type="year" value-format="YYYY" style="width:100%" />
@@ -142,11 +155,13 @@ const drawerVisible = ref(false)
 const submitting = ref(false)
 const editData = ref(null)
 const formRef = ref()
-const form = reactive({ taskName: '', templateId: '', statYear: '', deadline: '', remark: '' })
-const rules = {
+const form = reactive({ taskType: 'normal', taskName: '', templateId: '', statYear: '', deadline: '', remark: '' })
+const rules = computed(() => ({
   taskName:   [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  templateId: [{ required: true, message: '请选择关联模板', trigger: 'change' }]
-}
+  templateId: form.taskType === 'normal'
+    ? [{ required: true, message: '请选择关联模板', trigger: 'change' }]
+    : [],
+}))
 
 const templateList = ref([])
 const templateMap = computed(() => {
@@ -210,9 +225,9 @@ function resetQuery() { query.taskName = ''; query.status = null; query.statYear
 function openDrawer(row) {
   editData.value = row
   if (row) {
-    Object.assign(form, { taskName: row.taskName, templateId: row.templateId, statYear: row.statYear, deadline: row.deadline, remark: row.remark })
+    Object.assign(form, { taskType: row.taskType || 'normal', taskName: row.taskName, templateId: row.templateId, statYear: row.statYear, deadline: row.deadline, remark: row.remark })
   } else {
-    Object.assign(form, { taskName: '', templateId: '', statYear: '', deadline: '', remark: '' })
+    Object.assign(form, { taskType: 'normal', taskName: '', templateId: '', statYear: '', deadline: '', remark: '' })
   }
   drawerVisible.value = true
 }

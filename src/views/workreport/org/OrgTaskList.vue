@@ -80,7 +80,11 @@ function getDaysLeft(deadline) {
 }
 
 function goForm(task) {
-  router.push({ path: '/org/report-form', query: { taskId: task.id, templateId: task.templateId } })
+  if (task.taskType === 'daily_work') {
+    router.push(`/dw/record/${task.id}`)
+  } else {
+    router.push({ path: '/org/report-form', query: { taskId: task.id, templateId: task.templateId } })
+  }
 }
 
 const getRecordStatusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '未填报')

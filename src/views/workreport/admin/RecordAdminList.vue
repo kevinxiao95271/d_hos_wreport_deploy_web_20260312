@@ -143,7 +143,12 @@ async function handleExport() {
 }
 
 function goDetail(row) {
-  router.push({ path: '/admin/record-detail', query: { recordId: row.id, taskId: selectedTaskId.value } })
+  const task = taskList.value.find(t => t.id === selectedTaskId.value)
+  if (task?.taskType === 'daily_work') {
+    router.push({ path: '/admin/dw-view', query: { recordId: row.id } })
+  } else {
+    router.push({ path: '/admin/record-detail', query: { recordId: row.id, taskId: selectedTaskId.value } })
+  }
 }
 
 const recordStatusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '未提交')
