@@ -23,21 +23,51 @@
           <div class="module-header-admin">
             <span class="module-name-admin">{{ mod.moduleName }}</span>
             <div class="module-meta">
-              <!-- scoreDesc 虚线框 -->
-              <div v-if="mod.scoreDesc" class="module-score-desc">
-                <span class="score-desc-label">考核说明</span>
-                <span class="score-desc-text">{{ mod.scoreDesc }}</span>
+              <!-- 考核说明 -->
+              <div v-if="mod.scoreDesc" class="meta-box meta-box--desc">
+                <span class="meta-box-label">考核说明</span>
+                <span class="meta-box-text">{{ mod.scoreDesc }}</span>
               </div>
-              <!-- 管理员专属：分值 + 规则 -->
-              <div v-if="mod.scoreMax != null" class="score-admin-tags">
-                <el-tag type="warning" size="small">满分 {{ mod.scoreMax }} 分</el-tag>
-                <el-tooltip v-if="mod.scoreRule" :content="mod.scoreRule" placement="top" effect="light">
-                  <el-tag type="info" size="small" style="cursor:pointer">评分规则 ▾</el-tag>
-                </el-tooltip>
+              <!-- 评分规则 -->
+              <div v-if="mod.scoreRule" class="meta-box meta-box--rule">
+                <span class="meta-box-label">评分规则</span>
+                <span class="meta-box-text">{{ mod.scoreRule }}</span>
               </div>
             </div>
           </div>
         </template>
+
+        <!-- 评分行（有 scoreMax 时显示） -->
+        <div v-if="mod.scoreMax != null" class="score-input-bar">
+          <span class="score-bar-max">满分 {{ mod.scoreMax }} 分</span>
+          <span class="score-bar-sep"></span>
+          <span class="score-bar-label">实际得分</span>
+          <el-input-number
+            v-model="moduleScores[mod.moduleKey].actualScore"
+            :min="0"
+            :max="mod.scoreMax"
+            :precision="1"
+            :step="0.5"
+            size="small"
+            style="width:110px"
+            placeholder="得分"
+          />
+          <span class="score-bar-unit">分</span>
+          <span class="score-bar-sep"></span>
+          <span class="score-bar-label">备注</span>
+          <el-input
+            v-model="moduleScores[mod.moduleKey].remark"
+            placeholder="说明不足之处（选填）"
+            size="small"
+            style="flex:1; min-width:160px; max-width:360px"
+          />
+          <el-button
+            type="primary"
+            size="small"
+            :loading="savingKey === mod.moduleKey"
+            @click="saveModuleScore(mod)"
+          >保存评分</el-button>
+        </div>
 
         <!-- 多条记录型 -->
         <template v-if="isListModule(mod.moduleKey)">
@@ -153,7 +183,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close } from '@element-plus/icons-vue'
-import { getDwModules, getDwRecord, auditDwRecord } from '@/api/dailywork'
+import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
 import DwReadonlyBonuses     from './components/DwReadonlyBonuses.vue'
@@ -170,6 +200,42 @@ const previewRef  = ref(null)
 
 const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
 const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnabled))
+
+// 每模块评分状态
+const moduleScores = ref({})   // { [moduleKey]: { actualScore, remark } }
+const savingKey    = ref(null)
+
+function initModuleScores(mods) {
+  const s = {}
+  mods.forEach(m => {
+    if (m.scoreMax != null) {
+      s[m.moduleKey] = {
+        actualScore: m.actualScore ?? null,
+        remark:      m.scoreRemark ?? '',
+      }
+    }
+  })
+  moduleScores.value = s
+}
+
+async function saveModuleScore(mod) {
+  const entry = moduleScores.value[mod.moduleKey]
+  if (!entry) return
+  savingKey.value = mod.moduleKey
+  try {
+    await saveDwModuleScore({
+      recordId:    recordId,
+      moduleKey:   mod.moduleKey,
+      actualScore: entry.actualScore,
+      scoreRemark: entry.remark,
+    })
+    ElMessage.success(`${mod.moduleName} 评分已保存`)
+  } catch (e) {
+    ElMessage.error(e.message || '保存失败')
+  } finally {
+    savingKey.value = null
+  }
+}
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' }
@@ -240,6 +306,7 @@ async function loadAll() {
     const [modRes, detailRes] = await Promise.all([getDwModules(), getDwRecord(recordId)])
     modules.value = modRes.data    || []
     detail.value  = detailRes.data || {}
+    initModuleScores(modules.value)
   } finally { loading.value = false }
 }
 
@@ -265,30 +332,63 @@ onMounted(loadAll)
 .dw-admin-view { max-width: 960px; margin: 0 auto; }
 .module-card   { margin-bottom: 12px; }
 .bonus-type-label { font-size: 13px; font-weight: 600; color: #606266; margin: 0 0 10px; }
-.module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.module-name-admin   { font-size: 15px; font-weight: 600; color: #303133; flex-shrink: 0; padding-top: 2px; }
-.module-meta         { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.module-score-desc {
+.module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.module-name-admin   { font-size: 15px; font-weight: 600; color: #303133; flex-shrink: 0; padding-top: 4px; }
+.module-meta         { display: flex; flex-direction: column; gap: 6px; min-width: 320px; max-width: 460px; }
+
+/* 统一信息框：考核说明 + 评分规则共用结构，样式微差 */
+.meta-box {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  max-width: 440px;
-  border: 1px dashed #d0d7de;
+  gap: 8px;
   border-radius: 4px;
-  padding: 4px 10px;
-  background: #f9fafb;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.6;
 }
-.score-desc-label {
+.meta-box-label {
   font-size: 11px;
-  color: #fff;
-  background: #b0b8c1;
   border-radius: 2px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   white-space: nowrap;
   flex-shrink: 0;
+  color: #fff;
 }
-.score-desc-text { font-size: 12px; color: #606266; line-height: 1.5; }
-.score-admin-tags { display: flex; gap: 4px; align-items: center; }
+.meta-box-text { flex: 1; }
+
+/* 考核说明：灰色调 */
+.meta-box--desc {
+  border: 1px dashed #c8cdd6;
+  background: #f7f8fa;
+}
+.meta-box--desc .meta-box-label { background: #909399; }
+.meta-box--desc .meta-box-text  { color: #606266; }
+
+/* 评分规则：暖橙色调，稍深 */
+.meta-box--rule {
+  border: 1px dashed #f0b86b;
+  background: #fef8ee;
+}
+.meta-box--rule .meta-box-label { background: #e6a23c; }
+.meta-box--rule .meta-box-text  { color: #7d4e00; }
+
+/* 评分输入行 */
+.score-input-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: #f0f7ff;
+  border: 1px solid #d0e8ff;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.score-bar-max  { font-weight: 600; color: #e6a23c; white-space: nowrap; }
+.score-bar-sep  { width: 1px; height: 16px; background: #dcdfe6; flex-shrink: 0; }
+.score-bar-label { color: #606266; white-space: nowrap; }
+.score-bar-unit  { color: #606266; }
 
 /* guidance 县级分组 */
 .county-groups-wrap {

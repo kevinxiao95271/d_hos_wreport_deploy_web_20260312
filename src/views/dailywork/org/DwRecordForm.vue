@@ -139,8 +139,7 @@ const editable       = computed(() => detail.value.status === 0 || detail.value.
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) {
-  const match = key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' || (key || '').startsWith('bonus')
-  return match
+  return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp'
 }
 
 function getListItems(key) {
@@ -154,9 +153,7 @@ function getListItems(key) {
 }
 
 function getBonusItems(bonusType) {
-  const all = detail.value.bonuses || []
-  if (all.length) console.log('[DW] bonuses raw:', JSON.stringify(all.map(b => ({ id: b.id, bonusType: b.bonusType, pubName: b.pubName, compName: b.compName }))))
-  return all.filter(b => b.bonusType === bonusType)
+  return (detail.value.bonuses || []).filter(b => b.bonusType === bonusType)
 }
 
 async function loadAll() {
@@ -167,7 +164,6 @@ async function loadAll() {
       initDwRecord(taskId)
     ])
     modules.value = modRes.data || []
-    console.log('[DW] module keys:', modules.value.map(m => m.moduleKey))
     detail.value  = detailRes.data || detail.value
   } finally {
     pageLoading.value = false

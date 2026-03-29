@@ -45,3 +45,7 @@ export function uploadDwAttachment(recordId, moduleType, slot, file, subRecordId
 export const deleteDwAttachment = (id) => request.post(`/dw/record/attachment/delete/${id}`)
 
 export const getGuidanceRegions = () => request.get('/dw/config/guidance/regions')
+
+// 模块评分（管理员）
+export const saveDwModuleScore = (data) => request.post('/dw/record/module/score/save', data)
+// data: { recordId, moduleKey, actualScore, scoreRemark }
