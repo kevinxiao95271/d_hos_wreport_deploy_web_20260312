@@ -71,7 +71,8 @@
 
         <!-- 多条记录型 -->
         <template v-if="isListModule(mod.moduleKey)">
-          <el-collapse v-if="getListItems(mod.moduleKey).length">
+          <div v-if="getListItems(mod.moduleKey).length" class="collapse-scroll-wrap">
+          <el-collapse>
             <el-collapse-item
               v-for="item in getListItems(mod.moduleKey)"
               :key="item.id"
@@ -119,6 +120,7 @@
               <DwReadonlyAttachments :item="item" :module-key="mod.moduleKey" @preview="(u,n) => previewRef.show(u,n)" />
             </el-collapse-item>
           </el-collapse>
+          </div>
           <el-empty v-else description="暂无记录" :image-size="50" />
         </template>
 
@@ -389,6 +391,21 @@ onMounted(loadAll)
 .score-bar-sep  { width: 1px; height: 16px; background: #dcdfe6; flex-shrink: 0; }
 .score-bar-label { color: #606266; white-space: nowrap; }
 .score-bar-unit  { color: #606266; }
+
+/* 记录列表局部滚动容器 */
+.collapse-scroll-wrap {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #dcdfe6 transparent;
+}
+.collapse-scroll-wrap::-webkit-scrollbar { width: 6px; }
+.collapse-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+.collapse-scroll-wrap::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
+.collapse-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
 
 /* guidance 县级分组 */
 .county-groups-wrap {

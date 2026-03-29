@@ -5,6 +5,7 @@
 
     <!-- ① 已有记录：折叠列表 -->
     <template v-if="items.length">
+      <div class="collapse-scroll-wrap">
       <el-collapse v-model="openIds">
         <el-collapse-item v-for="item in items" :key="item.id" :name="item.id">
           <template #title>
@@ -43,6 +44,7 @@
           />
         </el-collapse-item>
       </el-collapse>
+      </div>
 
       <el-button v-if="editable" type="primary" plain style="margin-top:12px" @click="openDialog(null)">
         <el-icon><Plus /></el-icon> 新增加分项
@@ -313,4 +315,19 @@ async function handleDelete(item) {
   min-width: 200px;
 }
 .attach-slot-fmt { font-size: 11px; color: #909399; margin-bottom: 6px; }
+
+/* 记录列表局部滚动容器 */
+.collapse-scroll-wrap {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #dcdfe6 transparent;
+}
+.collapse-scroll-wrap::-webkit-scrollbar { width: 6px; }
+.collapse-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+.collapse-scroll-wrap::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
+.collapse-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
 </style>
