@@ -106,10 +106,11 @@
 
     <!-- 提交栏 -->
     <div v-if="editable" class="submit-bar">
+      <el-button size="large" @click="showDraftTip">保存草稿</el-button>
       <el-button type="primary" size="large" :loading="submitting" @click="handleSubmit">
         提交上报
       </el-button>
-      <span class="submit-hint">提交后将进入审核流程，不可再编辑</span>
+      <span class="submit-hint">各模块数据保存后自动留存，提交前可随时修改</span>
     </div>
   </div>
 </template>
@@ -185,6 +186,10 @@ async function handleSubmit() {
     await reloadDetail()
   } finally {
     submitting.value = false }
+}
+
+function showDraftTip() {
+  ElMessage({ message: '各模块数据已自动保存，提交前可随时修改', type: 'success', duration: 2500 })
 }
 
 const statusLabel = s => ({ 0: '草稿', 1: '已提交', 2: '已通过', 3: '已驳回' }[s] ?? '—')
