@@ -33,10 +33,15 @@ export function uploadDwAttachment(recordId, moduleType, slot, file, subRecordId
   const form = new FormData()
   form.append('file', file)
   const params = { recordId, moduleType, slot }
-  if (subRecordId) params.subRecordId = subRecordId
+  // guard against null, undefined, or the literal string "null"
+  if (subRecordId != null && subRecordId !== 'null' && subRecordId !== '') {
+    params.subRecordId = subRecordId
+  }
   return request.post('/dw/record/attachment/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     params
   })
 }
 export const deleteDwAttachment = (id) => request.post(`/dw/record/attachment/delete/${id}`)
+
+export const getGuidanceRegions = () => request.get('/dw/config/guidance/regions')

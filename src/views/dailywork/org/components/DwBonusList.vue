@@ -18,16 +18,12 @@
           </template>
 
           <el-descriptions :column="2" size="small" border>
-            <template v-if="bonusType === 'publication'">
-              <el-descriptions-item label="出版物名称">{{ item.pubName }}</el-descriptions-item>
-              <el-descriptions-item label="类别">{{ pubCategoryLabel(item.pubCategory) }}</el-descriptions-item>
-              <el-descriptions-item label="出版日期">{{ item.pubDate }}</el-descriptions-item>
-            </template>
-            <template v-else>
-              <el-descriptions-item label="竞赛名称">{{ item.compName }}</el-descriptions-item>
-              <el-descriptions-item label="主办类型">{{ compSponsorLabel(item.compSponsor) }}</el-descriptions-item>
-              <el-descriptions-item label="竞赛日期">{{ item.compDate }}</el-descriptions-item>
-            </template>
+            <el-descriptions-item v-if="bonusType === 'publication'" label="出版物名称">{{ item.pubName }}</el-descriptions-item>
+            <el-descriptions-item v-if="bonusType === 'publication'" label="类别">{{ pubCategoryLabel(item.pubCategory) }}</el-descriptions-item>
+            <el-descriptions-item v-if="bonusType === 'publication'" label="出版日期">{{ item.pubDate }}</el-descriptions-item>
+            <el-descriptions-item v-if="bonusType === 'competition'" label="竞赛名称">{{ item.compName }}</el-descriptions-item>
+            <el-descriptions-item v-if="bonusType === 'competition'" label="主办类型">{{ compSponsorLabel(item.compSponsor) }}</el-descriptions-item>
+            <el-descriptions-item v-if="bonusType === 'competition'" label="举办日期">{{ item.compDate }}</el-descriptions-item>
           </el-descriptions>
 
           <el-divider content-position="left" style="margin:10px 0 6px">证明文件</el-divider>
@@ -57,34 +53,30 @@
     <template v-else-if="editable">
       <div class="inline-form-wrap">
         <el-form :model="form" label-width="110px" ref="formRef" @submit.prevent>
-          <template v-if="bonusType === 'publication'">
-            <el-form-item label="出版物名称" prop="pubName" :rules="req">
-              <el-input v-model="form.pubName" placeholder="书名/指南名/共识名/标准名" />
-            </el-form-item>
-            <el-form-item label="类别" prop="pubCategory" :rules="req">
-              <el-select v-model="form.pubCategory" style="width:100%">
-                <el-option label="专著/指南/共识" value="book_guide_consensus" />
-                <el-option label="标准/规范" value="standard_norm" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="出版日期" prop="pubDate" :rules="req">
-              <el-date-picker v-model="form.pubDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-            </el-form-item>
-          </template>
-          <template v-else>
-            <el-form-item label="竞赛名称" prop="compName" :rules="req">
-              <el-input v-model="form.compName" placeholder="请输入竞赛名称" />
-            </el-form-item>
-            <el-form-item label="主办类型" prop="compSponsor" :rules="req">
-              <el-select v-model="form.compSponsor" style="width:100%">
-                <el-option label="省级联合主办" value="provincial_joint" />
-                <el-option label="其他" value="other" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="竞赛日期" prop="compDate" :rules="req">
-              <el-date-picker v-model="form.compDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-            </el-form-item>
-          </template>
+          <el-form-item v-if="bonusType === 'publication'" label="出版物名称" prop="pubName" :rules="req">
+            <el-input v-model="form.pubName" placeholder="书名/指南名/共识名/标准名" />
+          </el-form-item>
+          <el-form-item v-if="bonusType === 'publication'" label="类别" prop="pubCategory" :rules="req">
+            <el-select v-model="form.pubCategory" style="width:100%">
+              <el-option label="专著/指南/共识" value="book_guide_consensus" />
+              <el-option label="标准/规范" value="standard_norm" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="bonusType === 'publication'" label="出版日期" prop="pubDate" :rules="req">
+            <el-date-picker v-model="form.pubDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          </el-form-item>
+          <el-form-item v-if="bonusType === 'competition'" label="竞赛名称" prop="compName" :rules="req">
+            <el-input v-model="form.compName" placeholder="请输入竞赛名称" />
+          </el-form-item>
+          <el-form-item v-if="bonusType === 'competition'" label="主办类型" prop="compSponsor" :rules="req">
+            <el-select v-model="form.compSponsor" style="width:100%">
+              <el-option label="省级联合主办" value="provincial_joint" />
+              <el-option label="其他" value="other" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="bonusType === 'competition'" label="举办日期" prop="compDate" :rules="req">
+            <el-date-picker v-model="form.compDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          </el-form-item>
           <DwExtraFields
             v-if="moduleConfig.extraFields?.length"
             :fields="moduleConfig.extraFields"
@@ -92,8 +84,35 @@
             :editable="true"
           />
         </el-form>
+
+        <!-- 附件选择区 -->
+        <el-divider content-position="left" style="margin:14px 0 10px">
+          证明文件 <span class="attach-inline-tip">（选好后点「保存本条」一并上传）</span>
+        </el-divider>
+        <div class="attach-inline-slot">
+          <div class="attach-slot-fmt">支持 PDF / DOCX</div>
+          <div v-if="pendingEvidence.length" style="margin-bottom:6px">
+            <el-tag
+              v-for="(f, idx) in pendingEvidence"
+              :key="idx"
+              closable size="small"
+              style="margin:2px 4px 2px 0"
+              @close="pendingEvidence.splice(idx, 1)"
+            >{{ f.name }}</el-tag>
+          </div>
+          <el-upload
+            accept=".pdf,.docx,.doc"
+            :show-file-list="false"
+            :auto-upload="false"
+            multiple
+            :on-change="(file) => pendingEvidence.push(file.raw)"
+          >
+            <el-button size="small" plain :icon="Plus">选择文件</el-button>
+          </el-upload>
+        </div>
+
         <div class="inline-footer">
-          <el-button type="primary" :loading="saving" @click="handleSave">保存本条</el-button>
+          <el-button type="primary" :loading="uploadingInline" @click="handleSave">保存本条</el-button>
         </div>
       </div>
     </template>
@@ -104,34 +123,30 @@
     <!-- 编辑/新增弹窗（有列表时使用） -->
     <el-dialog v-model="dialogVisible" :title="editingItem ? '编辑加分项' : '新增加分项'" width="500px" destroy-on-close>
       <el-form :model="form" label-width="110px" ref="formRef">
-        <template v-if="bonusType === 'publication'">
-          <el-form-item label="出版物名称" prop="pubName" :rules="req">
-            <el-input v-model="form.pubName" placeholder="书名/指南名/共识名/标准名" />
-          </el-form-item>
-          <el-form-item label="类别" prop="pubCategory" :rules="req">
-            <el-select v-model="form.pubCategory" style="width:100%">
-              <el-option label="专著/指南/共识" value="book_guide_consensus" />
-              <el-option label="标准/规范" value="standard_norm" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="出版日期" prop="pubDate" :rules="req">
-            <el-date-picker v-model="form.pubDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-          </el-form-item>
-        </template>
-        <template v-else>
-          <el-form-item label="竞赛名称" prop="compName" :rules="req">
-            <el-input v-model="form.compName" placeholder="请输入竞赛名称" />
-          </el-form-item>
-          <el-form-item label="主办类型" prop="compSponsor" :rules="req">
-            <el-select v-model="form.compSponsor" style="width:100%">
-              <el-option label="省级联合主办" value="provincial_joint" />
-              <el-option label="其他" value="other" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="竞赛日期" prop="compDate" :rules="req">
-            <el-date-picker v-model="form.compDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-          </el-form-item>
-        </template>
+        <el-form-item v-if="bonusType === 'publication'" label="出版物名称" prop="pubName" :rules="req">
+          <el-input v-model="form.pubName" placeholder="书名/指南名/共识名/标准名" />
+        </el-form-item>
+        <el-form-item v-if="bonusType === 'publication'" label="类别" prop="pubCategory" :rules="req">
+          <el-select v-model="form.pubCategory" style="width:100%">
+            <el-option label="专著/指南/共识" value="book_guide_consensus" />
+            <el-option label="标准/规范" value="standard_norm" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="bonusType === 'publication'" label="出版日期" prop="pubDate" :rules="req">
+          <el-date-picker v-model="form.pubDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item v-if="bonusType === 'competition'" label="竞赛名称" prop="compName" :rules="req">
+          <el-input v-model="form.compName" placeholder="请输入竞赛名称" />
+        </el-form-item>
+        <el-form-item v-if="bonusType === 'competition'" label="主办类型" prop="compSponsor" :rules="req">
+          <el-select v-model="form.compSponsor" style="width:100%">
+            <el-option label="省级联合主办" value="provincial_joint" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="bonusType === 'competition'" label="举办日期" prop="compDate" :rules="req">
+          <el-date-picker v-model="form.compDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
         <DwExtraFields
           v-if="moduleConfig.extraFields?.length"
           :fields="moduleConfig.extraFields"
@@ -151,7 +166,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { saveBonus, deleteBonus, saveDwFieldValues } from '@/api/dailywork'
+import { saveBonus, deleteBonus, saveDwFieldValues, uploadDwAttachment } from '@/api/dailywork'
 import DwAttachSlot  from './DwAttachSlot.vue'
 import DwExtraFields from './DwExtraFields.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
@@ -174,7 +189,9 @@ const editingItem   = ref(null)
 const openIds       = ref([])
 const form          = ref({ extraValues: {} })
 const req           = [{ required: true, message: '不能为空', trigger: 'blur' }]
-const pendingOpenId = ref(null)
+const pendingOpenId   = ref(null)
+const pendingEvidence = ref([])    // 内联表单待上传的证明文件
+const uploadingInline = ref(false)
 
 const pubCategoryLabel = v => ({ book_guide_consensus: '专著/指南/共识', standard_norm: '标准/规范' }[v] ?? v)
 const compSponsorLabel = v => ({ provincial_joint: '省级联合主办', other: '其他' }[v] ?? v)
@@ -209,12 +226,17 @@ function openDialog(item) {
 
 async function handleSave() {
   await formRef.value?.validate()
-  saving.value = true
+
+  const isInline = !dialogVisible.value
+  if (isInline) uploadingInline.value = true
+  else saving.value = true
+
   try {
     const payload = { ...form.value }
     delete payload.extraValues
     const res = await saveBonus(payload)
     const savedId = res.data?.id
+
     if (savedId && Object.keys(form.value.extraValues || {}).length) {
       await saveDwFieldValues({
         recordId: String(props.recordId),
@@ -223,14 +245,32 @@ async function handleSave() {
         values: form.value.extraValues,
       })
     }
-    ElMessage.success('保存成功')
-    if (dialogVisible.value) {
-      dialogVisible.value = false
-    } else if (savedId) {
+
+    // 内联模式：批量上传待上传证明文件
+    if (isInline && savedId) {
+      let failed = false
+      for (const file of pendingEvidence.value) {
+        try {
+          await uploadDwAttachment(String(props.recordId), 'bonus', 'evidence', file, savedId)
+        } catch { failed = true }
+      }
+      pendingEvidence.value = []
+      if (failed) {
+        ElMessage.warning('记录已保存，但部分证明文件上传失败，请展开记录后重试')
+      } else {
+        ElMessage.success('保存成功')
+      }
       pendingOpenId.value = savedId
+    } else {
+      ElMessage.success('保存成功')
     }
+
+    if (dialogVisible.value) dialogVisible.value = false
     emit('saved')
-  } finally { saving.value = false }
+  } finally {
+    saving.value = false
+    uploadingInline.value = false
+  }
 }
 
 async function handleDelete(item) {
@@ -263,4 +303,14 @@ async function handleDelete(item) {
   padding-top: 12px;
   border-top: 1px solid #ebeef5;
 }
+.attach-inline-tip  { font-size: 11px; color: #909399; font-weight: 400; }
+.attach-inline-slot {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: inline-block;
+  min-width: 200px;
+}
+.attach-slot-fmt { font-size: 11px; color: #909399; margin-bottom: 6px; }
 </style>

@@ -12,16 +12,30 @@
     <el-descriptions border :column="3" size="small" style="margin-bottom:16px">
       <el-descriptions-item label="机构">{{ detail.orgName }}</el-descriptions-item>
       <el-descriptions-item label="任务">{{ detail.taskName }}</el-descriptions-item>
-      <el-descriptions-item label="驳回原因">{{ detail.auditRemark || '—' }}</el-descriptions-item>
+      <el-descriptions-item label="记录ID"><span style="font-family:monospace;font-size:12px">{{ detail.recordId }}</span></el-descriptions-item>
+      <el-descriptions-item label="驳回原因" :span="3">{{ detail.auditRemark || '—' }}</el-descriptions-item>
     </el-descriptions>
 
     <!-- 各模块只读展示 -->
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
       <el-card shadow="never" class="module-card">
         <template #header>
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-weight:600">{{ mod.moduleName }}</span>
-            <el-tag type="warning" size="small">满分 {{ mod.scoreMax }} 分</el-tag>
+          <div class="module-header-admin">
+            <span class="module-name-admin">{{ mod.moduleName }}</span>
+            <div class="module-meta">
+              <!-- scoreDesc 虚线框 -->
+              <div v-if="mod.scoreDesc" class="module-score-desc">
+                <span class="score-desc-label">考核说明</span>
+                <span class="score-desc-text">{{ mod.scoreDesc }}</span>
+              </div>
+              <!-- 管理员专属：分值 + 规则 -->
+              <div v-if="mod.scoreMax != null" class="score-admin-tags">
+                <el-tag type="warning" size="small">满分 {{ mod.scoreMax }} 分</el-tag>
+                <el-tooltip v-if="mod.scoreRule" :content="mod.scoreRule" placement="top" effect="light">
+                  <el-tag type="info" size="small" style="cursor:pointer">评分规则 ▾</el-tag>
+                </el-tooltip>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -41,6 +55,27 @@
                   :label="k"
                 >{{ v }}</el-descriptions-item>
               </el-descriptions>
+
+              <!-- guidance 专属：县级中心按市分组展示 -->
+              <template v-if="mod.moduleKey === 'guidance'">
+                <div class="county-groups-wrap">
+                  <div class="county-groups-title">
+                    省→市→县质控中心（{{ item.countyCenterCount ?? 0 }} 家）
+                  </div>
+                  <template v-if="item.countyCenterGroups?.length">
+                    <div
+                      v-for="g in item.countyCenterGroups"
+                      :key="g.cityName"
+                      class="county-group-row"
+                    >
+                      <span class="county-city-label">{{ g.cityName }}：</span>
+                      <span class="county-names">{{ g.counties.join('、') }}</span>
+                    </div>
+                  </template>
+                  <span v-else style="color:#c0c4cc;font-size:13px">—</span>
+                </div>
+              </template>
+
               <template v-if="mod.extraFields?.length">
                 <el-divider content-position="left" style="margin:10px 0 6px">扩展信息</el-divider>
                 <el-descriptions :column="2" size="small" border>
@@ -57,17 +92,21 @@
           <el-empty v-else description="暂无记录" :image-size="50" />
         </template>
 
-        <!-- 加分项 -->
-        <template v-else-if="mod.moduleKey === 'bonus'">
-          <div>
-            <p class="bonus-type-label">丛书 / 指南 / 共识出版</p>
-            <DwReadonlyBonuses :items="getBonusItems('publication')" @preview="(u,n) => previewRef.show(u,n)" />
-          </div>
-          <el-divider style="margin:12px 0" />
-          <div>
-            <p class="bonus-type-label">竞赛组织与主办</p>
-            <DwReadonlyBonuses :items="getBonusItems('competition')" @preview="(u,n) => previewRef.show(u,n)" />
-          </div>
+        <!-- 加分项：支持 bonus / bonus_pub / bonus_comp 三种 key -->
+        <template v-else-if="isBonusModule(mod.moduleKey)">
+          <template v-if="mod.moduleKey !== 'bonus_comp'">
+            <div>
+              <p v-if="mod.moduleKey === 'bonus'" class="bonus-type-label">丛书 / 指南 / 共识出版</p>
+              <DwReadonlyBonuses :items="getBonusItems('publication')" @preview="(u,n) => previewRef.show(u,n)" />
+            </div>
+          </template>
+          <el-divider v-if="mod.moduleKey === 'bonus'" style="margin:12px 0" />
+          <template v-if="mod.moduleKey !== 'bonus_pub'">
+            <div>
+              <p v-if="mod.moduleKey === 'bonus'" class="bonus-type-label">竞赛组织与主办</p>
+              <DwReadonlyBonuses :items="getBonusItems('competition')" @preview="(u,n) => previewRef.show(u,n)" />
+            </div>
+          </template>
         </template>
 
         <!-- 经费执行 -->
@@ -133,6 +172,7 @@ const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
 const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnabled))
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
+function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' }
 
 function getListItems(key) {
   return { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }[key]
@@ -147,28 +187,50 @@ function getBonusItems(bonusType) {
 const ITEM_NAME_KEY = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget' }
 function itemTitle(moduleKey, item) { return item[ITEM_NAME_KEY[moduleKey]] || `记录 ${item.id}` }
 
-const FORM_LABELS = { offline: '线下', online: '线上', hybrid: '线上+线下', onsite: '现场', baseline: '基线调研', special: '专项调研' }
+const ENUM_LABELS = {
+  offline: '线下', online: '线上', hybrid: '线上+线下',
+  onsite: '现场', baseline: '基线调研', special: '专项调研',
+}
 const FIELD_NAMES = {
-  meetingTime: '时间', meetingForm: '形式', attendeeCount: '参会人数', attendanceRate: '出勤率',
-  trainingTime: '时间', trainingForm: '形式', coverageRate: '覆盖率',
-  guidanceTime: '时间', guidanceForm: '形式', cityCenterCount: '省→市机构数', countyCenterCount: '省→县机构数', hospitalCount: '医院数',
-  surveyTime: '时间', surveyType: '类型', surveyForm: '方式',
+  meetingTime: '会议时间', meetingForm: '会议形式',
+  attendeeCount: '参会人数', attendanceRate: '出勤率',
+  trainingTime: '培训时间', trainingForm: '培训形式',
+  coverageRate: '覆盖率',
+  guidanceTime: '指导时间', guidanceForm: '指导形式',
+  hospitalCount: '医院数',
+  surveyTime: '调研时间', surveyType: '调研类型', surveyForm: '调研方式', surveyTarget: '调研对象',
 }
 function flattenItem(moduleKey, item) {
-  const skip = new Set(['id', 'recordId', 'delFlag', 'createUser', 'createTime', 'updateTime', 'extraValues',
-    'minutes', 'photos', 'signins', 'materials', 'evidences', 'reports', 'meetingContent', 'trainingContent', 'guidanceContent', 'surveyContent',
-    'meetingName', 'trainingName', 'surveyTarget', 'cityCenterIds', 'countyCenterIds'])
+  const skip = new Set([
+    'id', 'recordId', 'delFlag', 'createUser', 'createTime', 'updateTime', 'extraValues',
+    'minutes', 'photos', 'signins', 'materials', 'evidences', 'reports',
+    'meetingContent', 'trainingContent', 'guidanceContent', 'surveyContent',
+    'meetingName', 'trainingName', 'surveyTarget',
+    // guidance 机构相关：全部单独渲染，不进 flattenItem
+    'cityCenterIds', 'countyCenterIds', 'cityCenterCount', 'countyCenterCount',
+    'cityCenterNames', 'countyCenterNames', 'countyCenterGroups',
+  ])
   const r = {}
+
   Object.entries(item).forEach(([k, v]) => {
     if (skip.has(k) || v === null || v === undefined || v === '') return
     const label = FIELD_NAMES[k] || k
-    r[label] = FORM_LABELS[v] || (typeof v === 'number' ? v : v)
+    if (k === 'attendanceRate' || k === 'coverageRate') { r[label] = `${v}%`; return }
+    if (k === 'hospitalCount') { r[label] = `${v} 家`; return }
+    r[label] = ENUM_LABELS[v] ?? v
   })
-  // Add content/name back
-  if (item.meetingContent) r['内容'] = item.meetingContent
-  if (item.trainingContent) r['内容'] = item.trainingContent
-  if (item.guidanceContent) r['内容'] = item.guidanceContent
-  if (item.surveyContent) r['内容'] = item.surveyContent
+
+  // guidance：市级中心（平铺）放入 descriptions
+  if (moduleKey === 'guidance') {
+    const cityNames = item.cityCenterNames
+    const cityCount = item.cityCenterCount ?? 0
+    r[`省→市质控中心（${cityCount} 家）`] = Array.isArray(cityNames) && cityNames.length ? cityNames.join('、') : '—'
+  }
+
+  // 内容字段：最后追加，放 descriptions 末尾
+  const contentKey = { meeting: 'meetingContent', training: 'trainingContent', guidance: 'guidanceContent', survey: 'surveyContent' }[moduleKey]
+  if (contentKey && item[contentKey]) r['内容'] = item[contentKey]
+
   return r
 }
 
@@ -203,4 +265,53 @@ onMounted(loadAll)
 .dw-admin-view { max-width: 960px; margin: 0 auto; }
 .module-card   { margin-bottom: 12px; }
 .bonus-type-label { font-size: 13px; font-weight: 600; color: #606266; margin: 0 0 10px; }
+.module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.module-name-admin   { font-size: 15px; font-weight: 600; color: #303133; flex-shrink: 0; padding-top: 2px; }
+.module-meta         { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.module-score-desc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 440px;
+  border: 1px dashed #d0d7de;
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: #f9fafb;
+}
+.score-desc-label {
+  font-size: 11px;
+  color: #fff;
+  background: #b0b8c1;
+  border-radius: 2px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.score-desc-text { font-size: 12px; color: #606266; line-height: 1.5; }
+.score-admin-tags { display: flex; gap: 4px; align-items: center; }
+
+/* guidance 县级分组 */
+.county-groups-wrap {
+  margin-top: 8px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: #fafafa;
+  font-size: 13px;
+}
+.county-groups-title {
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.county-group-row {
+  line-height: 1.8;
+  color: #303133;
+}
+.county-city-label {
+  font-weight: 500;
+  color: #409eff;
+}
+.county-names { color: #606266; }
 </style>

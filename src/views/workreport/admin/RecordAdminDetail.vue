@@ -374,10 +374,13 @@ async function loadAll() {
     attachments.value  = attachRes.data || []
 
     // 获取模板全量信息（templateType 已包含在 data.template 中）
-    const fullRes = await getTemplateFullDetail(detail.record.templateId)
-    templateItems.value = fullRes.data.items || []
-    if (!templateRows.value.length) templateRows.value = fullRes.data.rows || []
-    if (fullRes.data.template?.templateType) templateType.value = fullRes.data.template.templateType
+    const tid = detail.record?.templateId
+    if (tid != null && tid !== 'null') {
+      const fullRes = await getTemplateFullDetail(tid)
+      templateItems.value = fullRes.data.items || []
+      if (!templateRows.value.length) templateRows.value = fullRes.data.rows || []
+      if (fullRes.data.template?.templateType) templateType.value = fullRes.data.template.templateType
+    }
 
     // score 模板：加载评分汇总
     if (templateType.value === 'score') {

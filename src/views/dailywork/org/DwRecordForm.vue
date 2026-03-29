@@ -24,7 +24,10 @@
         <template #header>
           <div class="module-header">
             <span class="module-name">{{ mod.moduleName }}</span>
-            <el-tag type="warning" size="small">满分 {{ mod.scoreMax }} 分</el-tag>
+            <div v-if="mod.scoreDesc" class="module-score-desc">
+              <span class="score-desc-label">考核说明</span>
+              <span class="score-desc-text">{{ mod.scoreDesc }}</span>
+            </div>
           </div>
         </template>
 
@@ -41,33 +44,37 @@
           />
         </template>
 
-        <!-- ② 加分项（publication + competition 两个子类在同一模块卡片内） -->
-        <template v-else-if="mod.moduleKey === 'bonus'">
-          <div class="bonus-section">
-            <p class="bonus-type-label">丛书 / 指南 / 共识出版</p>
-            <DwBonusList
-              bonus-type="publication"
-              :module-config="mod"
-              :items="getBonusItems('publication')"
-              :record-id="detail.recordId"
-              :editable="editable"
-              @saved="reloadDetail"
-              @deleted="reloadDetail"
-            />
-          </div>
-          <el-divider style="margin:16px 0" />
-          <div class="bonus-section">
-            <p class="bonus-type-label">竞赛组织与主办</p>
-            <DwBonusList
-              bonus-type="competition"
-              :module-config="mod"
-              :items="getBonusItems('competition')"
-              :record-id="detail.recordId"
-              :editable="editable"
-              @saved="reloadDetail"
-              @deleted="reloadDetail"
-            />
-          </div>
+        <!-- ② 加分项：支持 bonus / bonus_pub / bonus_comp 三种 key -->
+        <template v-else-if="isBonusModule(mod.moduleKey)">
+          <template v-if="mod.moduleKey !== 'bonus_comp'">
+            <div class="bonus-section">
+              <p v-if="mod.moduleKey === 'bonus'" class="bonus-type-label">丛书 / 指南 / 共识出版</p>
+              <DwBonusList
+                bonus-type="publication"
+                :module-config="mod"
+                :items="getBonusItems('publication')"
+                :record-id="detail.recordId"
+                :editable="editable"
+                @saved="reloadDetail"
+                @deleted="reloadDetail"
+              />
+            </div>
+          </template>
+          <el-divider v-if="mod.moduleKey === 'bonus'" style="margin:16px 0" />
+          <template v-if="mod.moduleKey !== 'bonus_pub'">
+            <div class="bonus-section">
+              <p v-if="mod.moduleKey === 'bonus'" class="bonus-type-label">竞赛组织与主办</p>
+              <DwBonusList
+                bonus-type="competition"
+                :module-config="mod"
+                :items="getBonusItems('competition')"
+                :record-id="detail.recordId"
+                :editable="editable"
+                @saved="reloadDetail"
+                @deleted="reloadDetail"
+              />
+            </div>
+          </template>
         </template>
 
         <!-- ③ 经费执行（特殊表单） -->
@@ -131,6 +138,10 @@ const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnab
 const editable       = computed(() => detail.value.status === 0 || detail.value.status === 3)
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
+function isBonusModule(key) {
+  const match = key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' || (key || '').startsWith('bonus')
+  return match
+}
 
 function getListItems(key) {
   const map = {
@@ -143,7 +154,9 @@ function getListItems(key) {
 }
 
 function getBonusItems(bonusType) {
-  return (detail.value.bonuses || []).filter(b => b.bonusType === bonusType)
+  const all = detail.value.bonuses || []
+  if (all.length) console.log('[DW] bonuses raw:', JSON.stringify(all.map(b => ({ id: b.id, bonusType: b.bonusType, pubName: b.pubName, compName: b.compName }))))
+  return all.filter(b => b.bonusType === bonusType)
 }
 
 async function loadAll() {
@@ -154,6 +167,7 @@ async function loadAll() {
       initDwRecord(taskId)
     ])
     modules.value = modRes.data || []
+    console.log('[DW] module keys:', modules.value.map(m => m.moduleKey))
     detail.value  = detailRes.data || detail.value
   } finally {
     pageLoading.value = false
@@ -201,4 +215,28 @@ onMounted(loadAll)
 .submit-hint { font-size: 13px; color: #909399; }
 .bonus-section { }
 .bonus-type-label { font-size: 13px; font-weight: 600; color: #606266; margin: 0 0 10px; }
+.module-score-desc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 460px;
+  border: 1px dashed #d0d7de;
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: #f9fafb;
+}
+.score-desc-label {
+  font-size: 11px;
+  color: #fff;
+  background: #b0b8c1;
+  border-radius: 2px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.score-desc-text {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.5;
+}
 </style>

@@ -140,10 +140,13 @@ onMounted(async () => {
     templateRows.value = detail.rows   || []
     attachments.value  = attachRes.data || []
 
-    const fullRes = await getTemplateFullDetail(detail.record.templateId)
-    templateItems.value = fullRes.data.items || []
-    if (!templateRows.value.length) {
-      templateRows.value = fullRes.data.rows || []
+    const tid = detail.record?.templateId
+    if (tid != null && tid !== 'null') {
+      const fullRes = await getTemplateFullDetail(tid)
+      templateItems.value = fullRes.data.items || []
+      if (!templateRows.value.length) {
+        templateRows.value = fullRes.data.rows || []
+      }
     }
   } finally { loading.value = false }
 })
