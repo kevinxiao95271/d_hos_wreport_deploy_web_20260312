@@ -117,7 +117,6 @@
               </template>
 
               <template v-if="mod.extraFields?.length">
-                <el-divider content-position="left" style="margin:10px 0 6px">扩展信息</el-divider>
                 <el-descriptions :column="2" size="small" border>
                   <el-descriptions-item v-for="ef in mod.extraFields" :key="ef.fieldKey" :label="ef.fieldName">
                     {{ item.extraValues?.[ef.fieldKey] ?? '—' }}

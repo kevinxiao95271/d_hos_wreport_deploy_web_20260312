@@ -42,7 +42,6 @@
 
     <!-- 扩展字段 -->
     <template v-if="moduleConfig.extraFields?.length">
-      <el-divider content-position="left" style="margin:12px 0 8px">扩展信息</el-divider>
       <el-form label-width="140px" style="max-width:560px">
         <DwExtraFields
           :fields="moduleConfig.extraFields"

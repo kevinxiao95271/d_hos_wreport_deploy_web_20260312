@@ -56,7 +56,6 @@
 
           <!-- 扩展字段预览 -->
           <template v-if="moduleConfig.extraFields?.length">
-            <el-divider content-position="left" style="margin:12px 0 8px">扩展信息</el-divider>
             <el-descriptions :column="2" size="small" border>
               <el-descriptions-item
                 v-for="ef in moduleConfig.extraFields"
@@ -139,14 +138,16 @@
               <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
                 <div class="time-range-row">
                   <span class="time-range-side-label">开始</span>
-                  <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+                  <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                    :disabled-date="disabledAfter(form[fd.endDateKey])" />
                   <el-select v-model="form[fd.startHalfKey]" style="width:90px">
                     <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
                   </el-select>
                 </div>
                 <div class="time-range-row" style="margin-top:6px">
                   <span class="time-range-side-label">结束</span>
-                  <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+                  <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                    :disabled-date="disabledBefore(form[fd.startDateKey])" />
                   <el-select v-model="form[fd.endHalfKey]" style="width:90px">
                     <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
                   </el-select>
@@ -263,14 +264,16 @@
             <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
               <div class="time-range-row">
                 <span class="time-range-side-label">开始</span>
-                <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+                <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                  :disabled-date="disabledAfter(form[fd.endDateKey])" />
                 <el-select v-model="form[fd.startHalfKey]" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
                 </el-select>
               </div>
               <div class="time-range-row" style="margin-top:6px">
                 <span class="time-range-side-label">结束</span>
-                <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+                <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                  :disabled-date="disabledBefore(form[fd.startDateKey])" />
                 <el-select v-model="form[fd.endHalfKey]" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
                 </el-select>
@@ -468,6 +471,15 @@ const LABEL_MAP = {
   onsite: '现场', baseline: '基线调研', special: '专项调研',
 }
 const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
+// 将 picker 传入的 Date 对象格式化为 YYYY-MM-DD 字符串（避免 new Date(str) 时区偏差）
+function pickerDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const disabledBefore = (limitDate) => (d) => limitDate ? pickerDateStr(d) < limitDate : false
+const disabledAfter  = (limitDate) => (d) => limitDate ? pickerDateStr(d) > limitDate : false
 function formatFixed(item, fd) {
   if (fd.type === 'timeRange') {
     const sD = item[fd.startDateKey], sH = item[fd.startHalfKey]

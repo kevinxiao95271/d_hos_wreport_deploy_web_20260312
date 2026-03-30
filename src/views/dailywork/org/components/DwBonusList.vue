@@ -80,14 +80,16 @@
             <div class="time-range-group">
               <div class="time-range-row">
                 <span class="time-range-side-label">开始</span>
-                <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+                <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                  :disabled-date="disabledAfter(form.compEndDate)" />
                 <el-select v-model="form.compStartHalf" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
                 </el-select>
               </div>
               <div class="time-range-row" style="margin-top:6px">
                 <span class="time-range-side-label">结束</span>
-                <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+                <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                  :disabled-date="disabledBefore(form.compStartDate)" />
                 <el-select v-model="form.compEndHalf" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
                 </el-select>
@@ -165,14 +167,16 @@
           <div class="time-range-group">
             <div class="time-range-row">
               <span class="time-range-side-label">开始</span>
-              <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+              <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                :disabled-date="disabledAfter(form.compEndDate)" />
               <el-select v-model="form.compStartHalf" style="width:90px">
                 <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
               </el-select>
             </div>
             <div class="time-range-row" style="margin-top:6px">
               <span class="time-range-side-label">结束</span>
-              <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+              <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                :disabled-date="disabledBefore(form.compStartDate)" />
               <el-select v-model="form.compEndHalf" style="width:90px">
                 <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
               </el-select>
@@ -229,6 +233,12 @@ const pubCategoryLabel = v => ({ book_guide_consensus: '专著/指南/共识', s
 const compSponsorLabel = v => ({ provincial_joint: '省级联合主办', other: '其他' }[v] ?? v)
 
 const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
+function pickerDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+const disabledBefore = (limit) => (d) => limit ? pickerDateStr(d) < limit : false
+const disabledAfter  = (limit) => (d) => limit ? pickerDateStr(d) > limit : false
+
 function formatCompDate(item) {
   const sD = item.compStartDate, sH = item.compStartHalf
   const eD = item.compEndDate,   eH = item.compEndHalf

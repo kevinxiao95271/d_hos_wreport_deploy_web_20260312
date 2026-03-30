@@ -29,22 +29,18 @@
         </div>
       </div>
     </div>
-    <el-upload
-      v-if="editable"
-      :show-file-list="false"
-      :before-upload="() => false"
-      :on-change="handleChange"
-      :accept="accept"
-      drag
-      class="slot-upload"
-    >
-      <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-      <div class="el-upload__text">拖拽或 <em>点击上传</em></div>
-      <template #tip>
-        <div v-if="formatHint" class="format-hint">{{ formatHint }}</div>
-        <div v-else-if="hint" class="upload-hint">{{ hint }}</div>
-      </template>
-    </el-upload>
+    <div v-if="editable" class="slot-upload-row">
+      <el-upload
+        :show-file-list="false"
+        :before-upload="() => false"
+        :on-change="handleChange"
+        :accept="accept"
+        class="slot-upload"
+      >
+        <el-button size="small" plain :icon="UploadFilled">点击上传</el-button>
+      </el-upload>
+      <span v-if="formatHint || hint" class="format-hint">{{ formatHint || hint }}</span>
+    </div>
     <div v-if="uploading" class="upload-progress">
       <el-icon class="is-loading"><Loading /></el-icon> 上传中…
     </div>
@@ -126,12 +122,9 @@ async function handleDelete(file) {
 .chip-icon   { color: #909399; flex-shrink: 0; }
 .chip-name   { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-actions { display: flex; gap: 2px; flex-shrink: 0; }
-.slot-upload :deep(.el-upload-dragger) {
-  padding: 12px 20px;
-  height: auto;
-}
-.format-hint { font-size: 12px; color: #409eff; margin-top: 4px; }
-.upload-hint { font-size: 12px; color: #909399; margin-top: 4px; }
+.slot-upload-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.slot-upload :deep(.el-upload) { display: inline-flex; }
+.format-hint { font-size: 11px; color: #909399; }
 .upload-progress {
   display: flex;
   align-items: center;
