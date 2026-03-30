@@ -22,14 +22,19 @@
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
       <el-card shadow="never" class="module-card">
         <template #header>
-          <div class="module-header">
-            <span class="module-name">{{ mod.moduleName }}</span>
+          <div class="module-header" @click="toggleModule(mod.moduleKey)" style="cursor:pointer">
+            <div class="module-header-left">
+              <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
+              <span class="module-name">{{ mod.moduleName }}</span>
+            </div>
             <div v-if="mod.scoreDesc" class="module-score-desc">
               <span class="score-desc-label">考核说明</span>
               <span class="score-desc-text">{{ mod.scoreDesc }}</span>
             </div>
           </div>
         </template>
+
+        <div v-show="!isCollapsed(mod.moduleKey)">
 
         <!-- ① 多条记录型：meeting / training / guidance / survey -->
         <template v-if="isListModule(mod.moduleKey)">
@@ -101,6 +106,7 @@
             @deleted="reloadDetail"
           />
         </template>
+        </div><!-- /v-show collapse body -->
       </el-card>
     </template>
 
@@ -119,6 +125,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, initDwRecord, submitDwRecord } from '@/api/dailywork'
 import DwSubList    from './components/DwSubList.vue'
 import DwBonusList  from './components/DwBonusList.vue'
@@ -137,6 +144,15 @@ const FILE_MODULES   = ['annual_work', 'it_construction', 'work_plan', 'admin_re
 
 const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnabled))
 const editable       = computed(() => detail.value.status === 0 || detail.value.status === 3)
+
+// 模块折叠状态
+const collapsedKeys = ref(new Set())
+function toggleModule(key) {
+  const s = new Set(collapsedKeys.value)
+  s.has(key) ? s.delete(key) : s.add(key)
+  collapsedKeys.value = s
+}
+function isCollapsed(key) { return collapsedKeys.value.has(key) }
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) {
@@ -205,8 +221,16 @@ onMounted(loadAll)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  user-select: none;
 }
+.module-header-left { display: flex; align-items: center; gap: 6px; }
 .module-name { font-size: 15px; font-weight: 600; color: #303133; }
+.toggle-icon {
+  font-size: 14px;
+  color: #909399;
+  transition: transform 0.25s;
+}
+.toggle-icon.is-collapsed { transform: rotate(-90deg); }
 .submit-bar {
   display: flex;
   align-items: center;

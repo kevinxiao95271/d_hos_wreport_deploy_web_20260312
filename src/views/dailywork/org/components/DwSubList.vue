@@ -130,6 +130,28 @@
               >
                 <template #suffix>%</template>
               </el-input-number>
+              <el-input-number
+                v-else-if="fd.type === 'selfScore'"
+                v-model="form[fd.key]" :min="0" :max="10" :precision="2" :step="0.5"
+                style="width:100%" controls-position="right"
+                :placeholder="fd.placeholder"
+              />
+              <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
+                <div class="time-range-row">
+                  <span class="time-range-side-label">开始</span>
+                  <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+                  <el-select v-model="form[fd.startHalfKey]" style="width:90px">
+                    <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+                  </el-select>
+                </div>
+                <div class="time-range-row" style="margin-top:6px">
+                  <span class="time-range-side-label">结束</span>
+                  <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+                  <el-select v-model="form[fd.endHalfKey]" style="width:90px">
+                    <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+                  </el-select>
+                </div>
+              </div>
             </el-form-item>
           </template>
 
@@ -238,6 +260,28 @@
             >
               <template #suffix>%</template>
             </el-input-number>
+            <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
+              <div class="time-range-row">
+                <span class="time-range-side-label">开始</span>
+                <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+                <el-select v-model="form[fd.startHalfKey]" style="width:90px">
+                  <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+                </el-select>
+              </div>
+              <div class="time-range-row" style="margin-top:6px">
+                <span class="time-range-side-label">结束</span>
+                <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+                <el-select v-model="form[fd.endHalfKey]" style="width:90px">
+                  <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+                </el-select>
+              </div>
+            </div>
+            <el-input-number
+              v-else-if="fd.type === 'selfScore'"
+              v-model="form[fd.key]" :min="0" :max="10" :precision="2" :step="0.5"
+              style="width:100%" controls-position="right"
+              :placeholder="fd.placeholder"
+            />
           </el-form-item>
         </template>
 
@@ -330,30 +374,39 @@ const countyTreeRef = ref(null)
 // ── 固定字段定义（guidance 不含树形选择字段）──────────────────
 const FIXED_FIELDS = {
   meeting: [
-    { key: 'meetingName',    label: '会议名称',  type: 'text',    placeholder: '请输入会议名称' },
-    { key: 'meetingTime',    label: '会议时间',  type: 'date' },
-    { key: 'meetingForm',    label: '会议形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }, { label: '线上+线下', value: 'hybrid' }] },
-    { key: 'attendeeCount',  label: '参会人数',  type: 'number',  placeholder: '人' },
-    { key: 'attendanceRate', label: '出勤率(%)', type: 'percent' },
-    { key: 'meetingContent', label: '会议内容',  type: 'text',    placeholder: '简要描述' },
+    { key: 'meetingName',      label: '会议名称',  type: 'text',    placeholder: '请输入会议名称' },
+    { key: 'meetingStartDate', label: '时间区间',  type: 'timeRange',
+      startDateKey: 'meetingStartDate', startHalfKey: 'meetingStartHalf',
+      endDateKey:   'meetingEndDate',   endHalfKey:   'meetingEndHalf' },
+    { key: 'meetingForm',      label: '会议形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }, { label: '线上+线下', value: 'hybrid' }] },
+    { key: 'attendeeCount',    label: '参会人数',  type: 'number',  placeholder: '人' },
+    { key: 'attendanceRate',   label: '出勤率(%)', type: 'percent' },
+    { key: 'meetingContent',   label: '会议内容',  type: 'text',    placeholder: '简要描述' },
+    { key: 'selfScore',        label: '自评分',    type: 'selfScore', placeholder: '0–10，保留两位小数' },
   ],
   training: [
-    { key: 'trainingName',    label: '培训名称',  type: 'text',    placeholder: '请输入培训名称' },
-    { key: 'trainingTime',    label: '培训时间',  type: 'date' },
-    { key: 'trainingForm',    label: '培训形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }] },
-    { key: 'attendeeCount',   label: '参训人数',  type: 'number',  placeholder: '人' },
-    { key: 'coverageRate',    label: '覆盖率(%)', type: 'percent' },
-    { key: 'trainingContent', label: '培训内容',  type: 'text',    placeholder: '简要描述' },
+    { key: 'trainingName',      label: '培训名称',  type: 'text',    placeholder: '请输入培训名称' },
+    { key: 'trainingStartDate', label: '时间区间',  type: 'timeRange',
+      startDateKey: 'trainingStartDate', startHalfKey: 'trainingStartHalf',
+      endDateKey:   'trainingEndDate',   endHalfKey:   'trainingEndHalf' },
+    { key: 'trainingForm',      label: '培训形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }] },
+    { key: 'attendeeCount',     label: '参训人数',  type: 'number',  placeholder: '人' },
+    { key: 'coverageRate',      label: '覆盖率(%)', type: 'percent' },
+    { key: 'trainingContent',   label: '培训内容',  type: 'text',    placeholder: '简要描述' },
   ],
   guidance: [
-    { key: 'guidanceTime',    label: '指导时间', type: 'date' },
+    { key: 'guidanceStartDate', label: '时间区间', type: 'timeRange',
+      startDateKey: 'guidanceStartDate', startHalfKey: 'guidanceStartHalf',
+      endDateKey:   'guidanceEndDate',   endHalfKey:   'guidanceEndHalf' },
     { key: 'guidanceForm',    label: '指导形式', type: 'select', options: [{ label: '现场', value: 'onsite' }, { label: '线上', value: 'online' }] },
     { key: 'guidanceContent', label: '指导内容', type: 'text',   placeholder: '简要描述' },
     // cityCenterIds / countyCenterIds 通过树形选择器处理，不在此列
     { key: 'hospitalCount',   label: '医院数',   type: 'number', placeholder: '家' },
   ],
   survey: [
-    { key: 'surveyTime',    label: '调研时间', type: 'date' },
+    { key: 'surveyStartDate', label: '时间区间', type: 'timeRange',
+      startDateKey: 'surveyStartDate', startHalfKey: 'surveyStartHalf',
+      endDateKey:   'surveyEndDate',   endHalfKey:   'surveyEndHalf' },
     { key: 'surveyTarget',  label: '调研对象', type: 'text',   placeholder: '请输入' },
     { key: 'surveyType',    label: '调研类型', type: 'select', options: [{ label: '基线调研', value: 'baseline' }, { label: '专项调研', value: 'special' }] },
     { key: 'surveyForm',    label: '调研方式', type: 'select', options: [{ label: '现场', value: 'onsite' }, { label: '线上', value: 'online' }] },
@@ -414,12 +467,20 @@ const LABEL_MAP = {
   offline: '线下', online: '线上', hybrid: '线上+线下',
   onsite: '现场', baseline: '基线调研', special: '专项调研',
 }
+const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
 function formatFixed(item, fd) {
+  if (fd.type === 'timeRange') {
+    const sD = item[fd.startDateKey], sH = item[fd.startHalfKey]
+    const eD = item[fd.endDateKey],   eH = item[fd.endHalfKey]
+    if (sD && eD) return `${sD} ${halfLabel(sH)} → ${eD} ${halfLabel(eH)}`
+    return '—'
+  }
   const v = item[fd.key]
   if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) return '—'
   if (fd._isList) return Array.isArray(v) ? v.join('、') : v
   if (fd.type === 'select') return LABEL_MAP[v] || v
   if (fd.type === 'percent') return `${v}%`
+  if (fd.type === 'selfScore') return `${v} 分`
   if (fd.type === 'number' && fd.key === 'hospitalCount') return `${v} 家`
   return v
 }
@@ -427,7 +488,7 @@ function formatFixed(item, fd) {
 const rules = computed(() => {
   const r = {}
   fixedFields.value.forEach(fd => {
-    if (fd.type !== 'number' && fd.type !== 'percent') {
+    if (fd.type !== 'number' && fd.type !== 'percent' && fd.type !== 'selfScore' && fd.type !== 'timeRange') {
       r[fd.key] = [{ required: true, message: `${fd.label}不能为空`, trigger: 'blur' }]
     }
   })
@@ -459,7 +520,16 @@ function onCountyCheck(_, state) {
 // ── 表单初始化 ──────────────────────────────────────────────
 function initBlankForm() {
   const blank = { recordId: props.recordId, extraValues: {}, cityCenterIds: [], countyCenterIds: [] }
-  fixedFields.value.forEach(fd => { blank[fd.key] = null })
+  fixedFields.value.forEach(fd => {
+    if (fd.type === 'timeRange') {
+      blank[fd.startDateKey] = null
+      blank[fd.startHalfKey] = 'AM'
+      blank[fd.endDateKey]   = null
+      blank[fd.endHalfKey]   = 'PM'
+    } else {
+      blank[fd.key] = null
+    }
+  })
   form.value     = blank
   editingItem.value = null
 }
@@ -486,6 +556,13 @@ function openDialog(item) {
       f.cityCenterIds   = parseIds(item.cityCenterIds)
       f.countyCenterIds = parseIds(item.countyCenterIds)
     }
+    // ensure half defaults for existing records that pre-date new fields
+    fixedFields.value.forEach(fd => {
+      if (fd.type === 'timeRange') {
+        if (!f[fd.startHalfKey]) f[fd.startHalfKey] = 'AM'
+        if (!f[fd.endHalfKey])   f[fd.endHalfKey]   = 'PM'
+      }
+    })
     form.value = f
   } else {
     initBlankForm()
@@ -498,6 +575,15 @@ function openEdit(item) { openDialog(item) }
 async function handleSave() {
   await formRef.value?.validate()
 
+  // validate timeRange pairs
+  for (const fd of fixedFields.value) {
+    if (fd.type === 'timeRange') {
+      const s = form.value[fd.startDateKey], e = form.value[fd.endDateKey]
+      if (!s || !e) { ElMessage.warning(`请填写「${fd.label}」的开始和结束日期`); return }
+      if (s > e)    { ElMessage.warning('开始日期不能晚于结束日期'); return }
+    }
+  }
+
   const isInline = !dialogVisible.value
   if (isInline) uploadingInline.value = true
   else saving.value = true
@@ -505,6 +591,11 @@ async function handleSave() {
   try {
     const payload = { ...form.value, recordId: props.recordId }
     delete payload.extraValues
+    // 旧时间字段已下线，确保不传
+    delete payload.meetingTime
+    delete payload.trainingTime
+    delete payload.guidanceTime
+    delete payload.surveyTime
 
     // guidance：序列化 IDs、计算数量
     if (props.moduleKey === 'guidance') {
@@ -635,6 +726,11 @@ async function handleDelete(item) {
 .collapse-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
+
+/* 时间区间控件 */
+.time-range-group { display: flex; flex-direction: column; }
+.time-range-row   { display: flex; align-items: center; gap: 8px; }
+.time-range-side-label { width: 28px; font-size: 13px; color: #606266; flex-shrink: 0; }
 
 /* guidance 县级分组只读 */
 .county-groups-wrap {

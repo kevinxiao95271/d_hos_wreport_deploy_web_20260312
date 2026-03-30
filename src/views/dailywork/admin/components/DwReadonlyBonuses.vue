@@ -10,7 +10,7 @@
           <el-descriptions-item v-if="item.bonusType === 'publication'" label="出版日期">{{ item.pubDate }}</el-descriptions-item>
           <el-descriptions-item v-if="item.bonusType === 'competition'" label="竞赛名称">{{ item.compName }}</el-descriptions-item>
           <el-descriptions-item v-if="item.bonusType === 'competition'" label="主办类型">{{ compSponsorLabel(item.compSponsor) }}</el-descriptions-item>
-          <el-descriptions-item v-if="item.bonusType === 'competition'" label="举办日期">{{ item.compDate }}</el-descriptions-item>
+          <el-descriptions-item v-if="item.bonusType === 'competition'" label="举办时间">{{ formatCompDate(item) }}</el-descriptions-item>
         </el-descriptions>
         <el-divider content-position="left" style="margin:8px 0 4px">证明文件</el-divider>
         <div class="file-list">
@@ -36,6 +36,13 @@ function ext(n) { return (n||'').split('.').pop().toLowerCase() }
 function canPreview(n) { const e=ext(n); return IMAGE_EXTS.includes(e)||PDF_EXTS.includes(e)||DOCX_EXTS.includes(e) }
 const pubCategoryLabel  = v => ({ book_guide_consensus: '专著/指南/共识', standard_norm: '标准/规范' }[v] ?? v ?? '—')
 const compSponsorLabel  = v => ({ provincial_joint: '省级联合主办', other: '其他' }[v] ?? v ?? '—')
+const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
+function formatCompDate(item) {
+  const sD = item.compStartDate, sH = item.compStartHalf
+  const eD = item.compEndDate,   eH = item.compEndHalf
+  if (sD && eD) return `${sD} ${halfLabel(sH)} → ${eD} ${halfLabel(eH)}`
+  return '—'
+}
 </script>
 <style scoped>
 .file-list { display:flex; flex-wrap:wrap; gap:6px; }

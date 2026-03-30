@@ -24,7 +24,7 @@
             <el-descriptions-item v-if="bonusType === 'publication'" label="出版日期">{{ item.pubDate }}</el-descriptions-item>
             <el-descriptions-item v-if="bonusType === 'competition'" label="竞赛名称">{{ item.compName }}</el-descriptions-item>
             <el-descriptions-item v-if="bonusType === 'competition'" label="主办类型">{{ compSponsorLabel(item.compSponsor) }}</el-descriptions-item>
-            <el-descriptions-item v-if="bonusType === 'competition'" label="举办日期">{{ item.compDate }}</el-descriptions-item>
+            <el-descriptions-item v-if="bonusType === 'competition'" label="举办时间">{{ formatCompDate(item) }}</el-descriptions-item>
           </el-descriptions>
 
           <el-divider content-position="left" style="margin:10px 0 6px">证明文件</el-divider>
@@ -76,8 +76,23 @@
               <el-option label="其他" value="other" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="bonusType === 'competition'" label="举办日期" prop="compDate" :rules="req">
-            <el-date-picker v-model="form.compDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          <el-form-item v-if="bonusType === 'competition'" label="举办时间">
+            <div class="time-range-group">
+              <div class="time-range-row">
+                <span class="time-range-side-label">开始</span>
+                <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+                <el-select v-model="form.compStartHalf" style="width:90px">
+                  <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+                </el-select>
+              </div>
+              <div class="time-range-row" style="margin-top:6px">
+                <span class="time-range-side-label">结束</span>
+                <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+                <el-select v-model="form.compEndHalf" style="width:90px">
+                  <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+                </el-select>
+              </div>
+            </div>
           </el-form-item>
           <DwExtraFields
             v-if="moduleConfig.extraFields?.length"
@@ -146,8 +161,23 @@
             <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="bonusType === 'competition'" label="举办日期" prop="compDate" :rules="req">
-          <el-date-picker v-model="form.compDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        <el-form-item v-if="bonusType === 'competition'" label="举办时间">
+          <div class="time-range-group">
+            <div class="time-range-row">
+              <span class="time-range-side-label">开始</span>
+              <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px" />
+              <el-select v-model="form.compStartHalf" style="width:90px">
+                <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+              </el-select>
+            </div>
+            <div class="time-range-row" style="margin-top:6px">
+              <span class="time-range-side-label">结束</span>
+              <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px" />
+              <el-select v-model="form.compEndHalf" style="width:90px">
+                <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
+              </el-select>
+            </div>
+          </div>
         </el-form-item>
         <DwExtraFields
           v-if="moduleConfig.extraFields?.length"
@@ -198,8 +228,19 @@ const uploadingInline = ref(false)
 const pubCategoryLabel = v => ({ book_guide_consensus: '专著/指南/共识', standard_norm: '标准/规范' }[v] ?? v)
 const compSponsorLabel = v => ({ provincial_joint: '省级联合主办', other: '其他' }[v] ?? v)
 
+const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
+function formatCompDate(item) {
+  const sD = item.compStartDate, sH = item.compStartHalf
+  const eD = item.compEndDate,   eH = item.compEndHalf
+  if (sD && eD) return `${sD} ${halfLabel(sH)} → ${eD} ${halfLabel(eH)}`
+  return '—'
+}
+
 function initBlankForm() {
-  form.value = { recordId: props.recordId, bonusType: props.bonusType, extraValues: {} }
+  form.value = {
+    recordId: props.recordId, bonusType: props.bonusType, extraValues: {},
+    compStartHalf: 'AM', compEndHalf: 'PM',
+  }
   editingItem.value = null
 }
 
@@ -220,14 +261,27 @@ onMounted(() => {
 
 function openDialog(item) {
   editingItem.value = item
-  form.value = item
-    ? { ...item, extraValues: { ...item.extraValues } }
-    : { recordId: props.recordId, bonusType: props.bonusType, extraValues: {} }
+  if (item) {
+    form.value = {
+      ...item,
+      extraValues:   { ...(item.extraValues || {}) },
+      compStartHalf: item.compStartHalf || 'AM',
+      compEndHalf:   item.compEndHalf   || 'PM',
+    }
+  } else {
+    initBlankForm()
+  }
   dialogVisible.value = true
 }
 
 async function handleSave() {
   await formRef.value?.validate()
+
+  if (props.bonusType === 'competition') {
+    const s = form.value.compStartDate, e = form.value.compEndDate
+    if (!s || !e) { ElMessage.warning('请填写举办开始和结束日期'); return }
+    if (s > e)    { ElMessage.warning('开始日期不能晚于结束日期'); return }
+  }
 
   const isInline = !dialogVisible.value
   if (isInline) uploadingInline.value = true
@@ -236,6 +290,8 @@ async function handleSave() {
   try {
     const payload = { ...form.value }
     delete payload.extraValues
+    // 旧字段已下线，确保不传
+    delete payload.compDate
     const res = await saveBonus(payload)
     const savedId = res.data?.id
 
@@ -315,6 +371,11 @@ async function handleDelete(item) {
   min-width: 200px;
 }
 .attach-slot-fmt { font-size: 11px; color: #909399; margin-bottom: 6px; }
+
+/* 时间区间控件 */
+.time-range-group { display: flex; flex-direction: column; }
+.time-range-row   { display: flex; align-items: center; gap: 8px; }
+.time-range-side-label { width: 28px; font-size: 13px; color: #606266; flex-shrink: 0; }
 
 /* 记录列表局部滚动容器 */
 .collapse-scroll-wrap {

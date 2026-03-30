@@ -20,8 +20,15 @@
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
       <el-card shadow="never" class="module-card">
         <template #header>
-          <div class="module-header-admin">
-            <span class="module-name-admin">{{ mod.moduleName }}</span>
+          <div class="module-header-admin" @click="toggleModule(mod.moduleKey)" style="cursor:pointer">
+            <div class="module-header-left">
+              <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
+              <span class="module-name-admin">{{ mod.moduleName }}</span>
+              <!-- 折叠时在标题旁显示得分概览 -->
+              <span v-if="mod.scoreMax != null && isCollapsed(mod.moduleKey)" class="header-score-badge">
+                得分 {{ moduleScores[mod.moduleKey]?.actualScore ?? '—' }} 分 / 总分 {{ mod.scoreMax }} 分
+              </span>
+            </div>
             <div class="module-meta">
               <!-- 考核说明 -->
               <div v-if="mod.scoreDesc" class="meta-box meta-box--desc">
@@ -36,6 +43,8 @@
             </div>
           </div>
         </template>
+
+        <div v-show="!isCollapsed(mod.moduleKey)">
 
         <!-- 评分行（有 scoreMax 时显示） -->
         <div v-if="mod.scoreMax != null" class="score-input-bar">
@@ -155,6 +164,8 @@
         <template v-else>
           <DwReadonlyFileModule :module-key="mod.moduleKey" :record="detail" @preview="(u,n) => previewRef.show(u,n)" />
         </template>
+
+        </div><!-- /v-show collapse body -->
       </el-card>
     </template>
 
@@ -184,7 +195,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Close } from '@element-plus/icons-vue'
+import { Check, Close, ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
@@ -202,6 +213,15 @@ const previewRef  = ref(null)
 
 const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
 const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnabled))
+
+// 模块折叠状态
+const collapsedKeys = ref(new Set())
+function toggleModule(key) {
+  const s = new Set(collapsedKeys.value)
+  s.has(key) ? s.delete(key) : s.add(key)
+  collapsedKeys.value = s
+}
+function isCollapsed(key) { return collapsedKeys.value.has(key) }
 
 // 每模块评分状态
 const moduleScores = ref({})   // { [moduleKey]: { actualScore, remark } }
@@ -260,14 +280,28 @@ const ENUM_LABELS = {
   onsite: '现场', baseline: '基线调研', special: '专项调研',
 }
 const FIELD_NAMES = {
-  meetingTime: '会议时间', meetingForm: '会议形式',
+  meetingStartDate: '会议时间', meetingForm: '会议形式',
   attendeeCount: '参会人数', attendanceRate: '出勤率',
-  trainingTime: '培训时间', trainingForm: '培训形式',
+  trainingStartDate: '培训时间', trainingForm: '培训形式',
   coverageRate: '覆盖率',
-  guidanceTime: '指导时间', guidanceForm: '指导形式',
+  guidanceStartDate: '指导时间', guidanceForm: '指导形式',
   hospitalCount: '医院数',
-  surveyTime: '调研时间', surveyType: '调研类型', surveyForm: '调研方式', surveyTarget: '调研对象',
+  surveyStartDate: '调研时间',
+  surveyType: '调研类型', surveyForm: '调研方式', surveyTarget: '调研对象',
+  selfScore: '自评分',
+  pubDate: '出版日期', compStartDate: '举办时间',
 }
+
+// 时间区间字段：startDateKey → [startHalfKey, endDateKey, endHalfKey, label]
+const TIME_RANGE_DEFS = {
+  meetingStartDate:  ['meetingStartHalf',  'meetingEndDate',  'meetingEndHalf',  '会议时间'],
+  trainingStartDate: ['trainingStartHalf', 'trainingEndDate', 'trainingEndHalf', '培训时间'],
+  guidanceStartDate: ['guidanceStartHalf', 'guidanceEndDate', 'guidanceEndHalf', '指导时间'],
+  surveyStartDate:   ['surveyStartHalf',   'surveyEndDate',   'surveyEndHalf',   '调研时间'],
+  compStartDate:     ['compStartHalf',     'compEndDate',     'compEndHalf',     '举办时间'],
+}
+const adminHalfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
+
 function flattenItem(moduleKey, item) {
   const skip = new Set([
     'id', 'recordId', 'delFlag', 'createUser', 'createTime', 'updateTime', 'extraValues',
@@ -277,14 +311,36 @@ function flattenItem(moduleKey, item) {
     // guidance 机构相关：全部单独渲染，不进 flattenItem
     'cityCenterIds', 'countyCenterIds', 'cityCenterCount', 'countyCenterCount',
     'cityCenterNames', 'countyCenterNames', 'countyCenterGroups',
+    // timeRange sub-fields consumed via startDate entry
+    'meetingStartHalf', 'meetingEndDate', 'meetingEndHalf',
+    'trainingStartHalf', 'trainingEndDate', 'trainingEndHalf',
+    'guidanceStartHalf', 'guidanceEndDate', 'guidanceEndHalf',
+    'surveyStartHalf', 'surveyEndDate', 'surveyEndHalf',
+    'compStartHalf', 'compEndDate', 'compEndHalf',
   ])
   const r = {}
 
   Object.entries(item).forEach(([k, v]) => {
-    if (skip.has(k) || v === null || v === undefined || v === '') return
+    if (skip.has(k)) return
+
+    if (v === null || v === undefined || v === '') return
+
+    // Handle timeRange startDate key
+    if (TIME_RANGE_DEFS[k]) {
+      const [sHKey, eKey, eHKey, label] = TIME_RANGE_DEFS[k]
+      const eD = item[eKey]
+      if (v && eD) {
+        r[label] = `${v} ${adminHalfLabel(item[sHKey])} → ${eD} ${adminHalfLabel(item[eHKey])}`
+      } else {
+        r[label] = v
+      }
+      return
+    }
+
     const label = FIELD_NAMES[k] || k
     if (k === 'attendanceRate' || k === 'coverageRate') { r[label] = `${v}%`; return }
     if (k === 'hospitalCount') { r[label] = `${v} 家`; return }
+    if (k === 'selfScore') { r[label] = `${v} 分`; return }
     r[label] = ENUM_LABELS[v] ?? v
   })
 
@@ -334,9 +390,27 @@ onMounted(loadAll)
 .dw-admin-view { max-width: 960px; margin: 0 auto; }
 .module-card   { margin-bottom: 12px; }
 .bonus-type-label { font-size: 13px; font-weight: 600; color: #606266; margin: 0 0 10px; }
-.module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.module-name-admin   { font-size: 15px; font-weight: 600; color: #303133; flex-shrink: 0; padding-top: 4px; }
+.module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; user-select: none; }
+.module-header-left  { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-top: 4px; }
+.module-name-admin   { font-size: 15px; font-weight: 600; color: #303133; }
 .module-meta         { display: flex; flex-direction: column; gap: 6px; min-width: 320px; max-width: 460px; }
+.toggle-icon {
+  font-size: 14px;
+  color: #909399;
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+.toggle-icon.is-collapsed { transform: rotate(-90deg); }
+.header-score-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6a23c;
+  background: #fdf6ec;
+  border: 1px solid #f0b86b;
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
 
 /* 统一信息框：考核说明 + 评分规则共用结构，样式微差 */
 .meta-box {
