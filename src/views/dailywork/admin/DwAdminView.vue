@@ -287,7 +287,6 @@ const FIELD_NAMES = {
   hospitalCount: '医院数',
   surveyStartDate: '调研时间',
   surveyType: '调研类型', surveyForm: '调研方式', surveyTarget: '调研对象',
-  selfScore: '自评分',
   pubDate: '出版日期', compStartDate: '举办时间',
 }
 
@@ -339,7 +338,6 @@ function flattenItem(moduleKey, item) {
     const label = FIELD_NAMES[k] || k
     if (k === 'attendanceRate' || k === 'coverageRate') { r[label] = `${v}%`; return }
     if (k === 'hospitalCount') { r[label] = `${v} 家`; return }
-    if (k === 'selfScore') { r[label] = `${v} 分`; return }
     r[label] = ENUM_LABELS[v] ?? v
   })
 

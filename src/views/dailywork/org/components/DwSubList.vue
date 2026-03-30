@@ -54,11 +54,11 @@
             </div>
           </template>
 
-          <!-- 扩展字段预览 -->
-          <template v-if="moduleConfig.extraFields?.length">
+          <!-- 扩展字段预览（跳过模块级自评分，它在父节点展示） -->
+          <template v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length">
             <el-descriptions :column="2" size="small" border>
               <el-descriptions-item
-                v-for="ef in moduleConfig.extraFields"
+                v-for="ef in moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
                 :key="ef.fieldKey"
                 :label="ef.fieldName"
               >{{ item.extraValues?.[ef.fieldKey] ?? '—' }}</el-descriptions-item>
@@ -129,12 +129,6 @@
               >
                 <template #suffix>%</template>
               </el-input-number>
-              <el-input-number
-                v-else-if="fd.type === 'selfScore'"
-                v-model="form[fd.key]" :min="0" :max="10" :precision="2" :step="0.5"
-                style="width:100%" controls-position="right"
-                :placeholder="fd.placeholder"
-              />
               <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
                 <div class="time-range-row">
                   <span class="time-range-side-label">开始</span>
@@ -184,10 +178,10 @@
             </el-form-item>
           </template>
 
-          <!-- 扩展字段 -->
+          <!-- 扩展字段（跳过模块级自评分） -->
           <DwExtraFields
-            v-if="moduleConfig.extraFields?.length"
-            :fields="moduleConfig.extraFields"
+            v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length"
+            :fields="moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
             v-model="form.extraValues"
             :editable="true"
           />
@@ -279,12 +273,6 @@
                 </el-select>
               </div>
             </div>
-            <el-input-number
-              v-else-if="fd.type === 'selfScore'"
-              v-model="form[fd.key]" :min="0" :max="10" :precision="2" :step="0.5"
-              style="width:100%" controls-position="right"
-              :placeholder="fd.placeholder"
-            />
           </el-form-item>
         </template>
 
@@ -317,8 +305,8 @@
         </template>
 
         <DwExtraFields
-          v-if="moduleConfig.extraFields?.length"
-          :fields="moduleConfig.extraFields"
+          v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length"
+          :fields="moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
           v-model="form.extraValues"
           :editable="true"
         />
@@ -385,7 +373,6 @@ const FIXED_FIELDS = {
     { key: 'attendeeCount',    label: '参会人数',  type: 'number',  placeholder: '人' },
     { key: 'attendanceRate',   label: '出勤率(%)', type: 'percent' },
     { key: 'meetingContent',   label: '会议内容',  type: 'text',    placeholder: '简要描述' },
-    { key: 'selfScore',        label: '自评分',    type: 'selfScore', placeholder: '0–10，保留两位小数' },
   ],
   training: [
     { key: 'trainingName',      label: '培训名称',  type: 'text',    placeholder: '请输入培训名称' },
@@ -492,7 +479,6 @@ function formatFixed(item, fd) {
   if (fd._isList) return Array.isArray(v) ? v.join('、') : v
   if (fd.type === 'select') return LABEL_MAP[v] || v
   if (fd.type === 'percent') return `${v}%`
-  if (fd.type === 'selfScore') return `${v} 分`
   if (fd.type === 'number' && fd.key === 'hospitalCount') return `${v} 家`
   return v
 }
@@ -500,7 +486,7 @@ function formatFixed(item, fd) {
 const rules = computed(() => {
   const r = {}
   fixedFields.value.forEach(fd => {
-    if (fd.type !== 'number' && fd.type !== 'percent' && fd.type !== 'selfScore' && fd.type !== 'timeRange') {
+    if (fd.type !== 'number' && fd.type !== 'percent' && fd.type !== 'timeRange') {
       r[fd.key] = [{ required: true, message: `${fd.label}不能为空`, trigger: 'blur' }]
     }
   })

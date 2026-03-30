@@ -26,6 +26,9 @@
             <div class="module-header-left">
               <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
               <span class="module-name">{{ mod.moduleName }}</span>
+              <span v-if="mod.scoreMax" class="header-self-score-badge">
+                自评分 {{ moduleSelfScores[mod.moduleKey] ?? '—' }} / 满分 {{ mod.scoreMax }}
+              </span>
             </div>
             <div v-if="mod.scoreDesc" class="module-score-desc">
               <span class="score-desc-label">考核说明</span>
@@ -35,6 +38,22 @@
         </template>
 
         <div v-show="!isCollapsed(mod.moduleKey)">
+
+        <!-- 模块自评分输入行 -->
+        <div v-if="editable && mod.scoreMax" class="module-self-score-editor" @click.stop>
+          <span class="self-score-label">项目自评分</span>
+          <el-input-number
+            v-model="moduleSelfScores[mod.moduleKey]"
+            :min="0" :max="mod.scoreMax" :precision="1" :step="0.5"
+            size="small" style="width:130px"
+          />
+          <span class="self-score-unit">/ {{ mod.scoreMax }} 分</span>
+          <el-button
+            size="small" type="primary"
+            :loading="savingSelfScoreKey === mod.moduleKey"
+            @click.stop="saveModuleSelfScore(mod)"
+          >保存自评分</el-button>
+        </div>
 
         <!-- ① 多条记录型：meeting / training / guidance / survey -->
         <template v-if="isListModule(mod.moduleKey)">
@@ -126,7 +145,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { getDwModules, initDwRecord, submitDwRecord } from '@/api/dailywork'
+import { getDwModules, initDwRecord, getDwRecord, submitDwRecord, saveDwFieldValues } from '@/api/dailywork'
 import DwSubList    from './components/DwSubList.vue'
 import DwBonusList  from './components/DwBonusList.vue'
 import DwFundingForm from './components/DwFundingForm.vue'
@@ -138,6 +157,8 @@ const pageLoading = ref(true)
 const submitting  = ref(false)
 const modules     = ref([])
 const detail      = ref({ status: 0, meetings: [], trainings: [], guidances: [], surveys: [], bonuses: [], funding: null, fundingExtra: {} })
+const moduleSelfScores   = ref({})
+const savingSelfScoreKey = ref(null)
 
 const LIST_MODULES   = ['meeting', 'training', 'guidance', 'survey']
 const FILE_MODULES   = ['annual_work', 'it_construction', 'work_plan', 'admin_response', 'activity_report']
@@ -173,15 +194,26 @@ function getBonusItems(bonusType) {
   return (detail.value.bonuses || []).filter(b => b.bonusType === bonusType)
 }
 
+function initModuleSelfScores(scores) {
+  moduleSelfScores.value = scores ? { ...scores } : {}
+}
+
 async function loadAll() {
   pageLoading.value = true
   try {
-    const [modRes, detailRes] = await Promise.all([
-      getDwModules(),
-      initDwRecord(taskId)
-    ])
+    const [modRes, initRes] = await Promise.all([getDwModules(), initDwRecord(taskId)])
     modules.value = modRes.data || []
-    detail.value  = detailRes.data || detail.value
+    const initData = initRes.data || {}
+    detail.value = initData
+    // initDwRecord already returns moduleSelfScores; also fetch via getDwRecord for freshness
+    if (initData.recordId) {
+      const recRes = await getDwRecord(initData.recordId)
+      const rec = recRes.data || {}
+      detail.value = { ...initData, ...rec }
+      initModuleSelfScores(rec.moduleSelfScores)
+    } else {
+      initModuleSelfScores(initData.moduleSelfScores)
+    }
   } finally {
     pageLoading.value = false
   }
@@ -189,9 +221,42 @@ async function loadAll() {
 
 async function reloadDetail() {
   try {
-    const res = await initDwRecord(taskId)
-    detail.value = res.data || detail.value
+    const initRes = await initDwRecord(taskId)
+    const initData = initRes.data || {}
+    detail.value = initData
+    if (initData.recordId) {
+      const recRes = await getDwRecord(initData.recordId)
+      const rec = recRes.data || {}
+      detail.value = { ...initData, ...rec }
+      initModuleSelfScores(rec.moduleSelfScores)
+    } else {
+      initModuleSelfScores(initData.moduleSelfScores)
+    }
   } catch { /* ignore */ }
+}
+
+async function saveModuleSelfScore(mod) {
+  const score = moduleSelfScores.value[mod.moduleKey]
+  if (score === null || score === undefined || score === '') {
+    ElMessage.warning('请输入自评分')
+    return
+  }
+  if (score < 0 || score > mod.scoreMax) {
+    ElMessage.warning(`自评分须在 0 ~ ${mod.scoreMax} 之间`)
+    return
+  }
+  savingSelfScoreKey.value = mod.moduleKey
+  try {
+    await saveDwFieldValues({
+      recordId: detail.value.recordId,
+      moduleKey: mod.moduleKey,
+      subRecordId: null,
+      values: { module_self_score: String(score) }
+    })
+    ElMessage.success('自评分已保存')
+  } finally {
+    savingSelfScoreKey.value = null
+  }
 }
 
 async function handleSubmit() {
@@ -263,5 +328,36 @@ onMounted(loadAll)
   font-size: 12px;
   color: #606266;
   line-height: 1.5;
+}
+.header-self-score-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: #fff;
+  background: #409eff;
+  border-radius: 10px;
+  padding: 2px 10px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.module-self-score-editor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+.self-score-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
+}
+.self-score-unit {
+  font-size: 13px;
+  color: #909399;
+  white-space: nowrap;
 }
 </style>
