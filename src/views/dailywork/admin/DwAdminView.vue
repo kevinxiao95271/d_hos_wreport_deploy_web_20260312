@@ -282,7 +282,7 @@ const FIELD_NAMES = {
   meetingStartDate: '会议时间', meetingForm: '会议形式',
   attendeeCount: '参会人数', attendanceRate: '出勤率',
   trainingStartDate: '培训时间', trainingForm: '培训形式',
-  coverageRate: '覆盖率',
+  trainingPeopleCount: '培训人数',
   guidanceStartDate: '指导时间', guidanceForm: '指导形式',
   hospitalCount: '医院数',
   surveyStartDate: '调研时间',
@@ -315,6 +315,7 @@ function flattenItem(moduleKey, item) {
     'guidanceStartHalf', 'guidanceEndDate', 'guidanceEndHalf',
     'surveyStartHalf', 'surveyEndDate', 'surveyEndHalf',
     'compStartHalf', 'compEndDate', 'compEndHalf',
+    'coverageRate',
   ])
   const r = {}
 
@@ -336,7 +337,7 @@ function flattenItem(moduleKey, item) {
     }
 
     const label = FIELD_NAMES[k] || k
-    if (k === 'attendanceRate' || k === 'coverageRate') { r[label] = `${v}%`; return }
+    if (k === 'attendanceRate') { r[label] = `${v}%`; return }
     if (k === 'hospitalCount') { r[label] = `${v} 家`; return }
     r[label] = ENUM_LABELS[v] ?? v
   })

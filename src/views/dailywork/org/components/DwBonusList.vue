@@ -97,8 +97,8 @@
             </div>
           </el-form-item>
           <DwExtraFields
-            v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length"
-            :fields="moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
+            v-if="moduleConfig.extraFields?.length"
+            :fields="moduleConfig.extraFields"
             v-model="form.extraValues"
             :editable="true"
           />
@@ -184,8 +184,8 @@
           </div>
         </el-form-item>
         <DwExtraFields
-          v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length"
-          :fields="moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
+          v-if="moduleConfig.extraFields?.length"
+          :fields="moduleConfig.extraFields"
           v-model="form.extraValues"
           :editable="true"
         />

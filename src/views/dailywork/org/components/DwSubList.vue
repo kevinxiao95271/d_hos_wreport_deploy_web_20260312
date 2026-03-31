@@ -54,11 +54,11 @@
             </div>
           </template>
 
-          <!-- 扩展字段预览（跳过模块级自评分，它在父节点展示） -->
-          <template v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length">
+          <!-- 扩展字段预览（extraFields 仅子记录级动态字段，不含 module_self_score） -->
+          <template v-if="moduleConfig.extraFields?.length">
             <el-descriptions :column="2" size="small" border>
               <el-descriptions-item
-                v-for="ef in moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
+                v-for="ef in moduleConfig.extraFields"
                 :key="ef.fieldKey"
                 :label="ef.fieldName"
               >{{ item.extraValues?.[ef.fieldKey] ?? '—' }}</el-descriptions-item>
@@ -305,8 +305,8 @@
         </template>
 
         <DwExtraFields
-          v-if="moduleConfig.extraFields?.filter(f => f.fieldKey !== 'module_self_score').length"
-          :fields="moduleConfig.extraFields.filter(f => f.fieldKey !== 'module_self_score')"
+          v-if="moduleConfig.extraFields?.length"
+          :fields="moduleConfig.extraFields"
           v-model="form.extraValues"
           :editable="true"
         />
@@ -380,8 +380,7 @@ const FIXED_FIELDS = {
       startDateKey: 'trainingStartDate', startHalfKey: 'trainingStartHalf',
       endDateKey:   'trainingEndDate',   endHalfKey:   'trainingEndHalf' },
     { key: 'trainingForm',      label: '培训形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }] },
-    { key: 'attendeeCount',     label: '参训人数',  type: 'number',  placeholder: '人' },
-    { key: 'coverageRate',      label: '覆盖率(%)', type: 'percent' },
+    { key: 'trainingPeopleCount', label: '培训人数', type: 'number', placeholder: '人' },
     { key: 'trainingContent',   label: '培训内容',  type: 'text',    placeholder: '简要描述' },
   ],
   guidance: [
@@ -550,6 +549,12 @@ function openDialog(item) {
   editingItem.value = item
   if (item) {
     const f = { ...item, extraValues: { ...(item.extraValues || {}) } }
+    if (props.moduleKey === 'meeting') delete f.extraValues.budget_amount
+    if (props.moduleKey === 'training') {
+      f.trainingPeopleCount = item.trainingPeopleCount ?? item.attendeeCount ?? null
+      delete f.attendeeCount
+      delete f.coverageRate
+    }
     if (props.moduleKey === 'guidance') {
       f.cityCenterIds   = parseIds(item.cityCenterIds)
       f.countyCenterIds = parseIds(item.countyCenterIds)
@@ -594,6 +599,10 @@ async function handleSave() {
     delete payload.trainingTime
     delete payload.guidanceTime
     delete payload.surveyTime
+    if (props.moduleKey === 'training') {
+      delete payload.coverageRate
+      delete payload.attendeeCount
+    }
 
     // guidance：序列化 IDs、计算数量
     if (props.moduleKey === 'guidance') {
@@ -606,8 +615,9 @@ async function handleSave() {
     const res     = await SAVE_FN[props.moduleKey](payload)
     const savedId = res.data?.id
 
-    // 扩展字段
-    const extraVals = form.value.extraValues || {}
+    // 扩展字段（会议模块已下线 budget_amount，不再提交）
+    const extraVals = { ...(form.value.extraValues || {}) }
+    if (props.moduleKey === 'meeting') delete extraVals.budget_amount
     if (savedId && Object.keys(extraVals).length) {
       await saveDwFieldValues({
         recordId: String(props.recordId),
