@@ -137,7 +137,7 @@
               <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
                 <div class="time-range-row">
                   <span class="time-range-side-label">开始</span>
-                  <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                  <el-date-picker :key="`s-start-${form[fd.endDateKey]}`" v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
                     :disabled-date="disabledAfter(form[fd.endDateKey])" />
                   <el-select v-model="form[fd.startHalfKey]" style="width:90px">
                     <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -145,7 +145,7 @@
                 </div>
                 <div class="time-range-row" style="margin-top:6px">
                   <span class="time-range-side-label">结束</span>
-                  <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                  <el-date-picker :key="`s-end-${form[fd.startDateKey]}`" v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
                     :disabled-date="disabledBefore(form[fd.startDateKey])" />
                   <el-select v-model="form[fd.endHalfKey]" style="width:90px">
                     <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -263,7 +263,7 @@
             <div v-else-if="fd.type === 'timeRange'" class="time-range-group">
               <div class="time-range-row">
                 <span class="time-range-side-label">开始</span>
-                <el-date-picker v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                <el-date-picker :key="`d-start-${form[fd.endDateKey]}`" v-model="form[fd.startDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
                   :disabled-date="disabledAfter(form[fd.endDateKey])" />
                 <el-select v-model="form[fd.startHalfKey]" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -271,7 +271,7 @@
               </div>
               <div class="time-range-row" style="margin-top:6px">
                 <span class="time-range-side-label">结束</span>
-                <el-date-picker v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                <el-date-picker :key="`d-end-${form[fd.startDateKey]}`" v-model="form[fd.endDateKey]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
                   :disabled-date="disabledBefore(form[fd.startDateKey])" />
                 <el-select v-model="form[fd.endHalfKey]" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -596,20 +596,28 @@ function openEdit(item) { openDialog(item) }
 
 // ── 保存 ────────────────────────────────────────────────────
 async function handleSave() {
-  await formRef.value?.validate()
+  if (saving.value || uploadingInline.value) return
+
+  const isInline = !dialogVisible.value
+  if (isInline) uploadingInline.value = true
+  else saving.value = true
+
+  try {
+    await formRef.value?.validate()
+  } catch {
+    saving.value = false
+    uploadingInline.value = false
+    return
+  }
 
   // validate timeRange pairs
   for (const fd of fixedFields.value) {
     if (fd.type === 'timeRange') {
       const s = form.value[fd.startDateKey], e = form.value[fd.endDateKey]
-      if (!s || !e) { ElMessage.warning(`请填写「${fd.label}」的开始和结束日期`); return }
-      if (s > e)    { ElMessage.warning('开始日期不能晚于结束日期'); return }
+      if (!s || !e) { ElMessage.warning(`请填写「${fd.label}」的开始和结束日期`); saving.value = false; uploadingInline.value = false; return }
+      if (s > e)    { ElMessage.warning('开始日期不能晚于结束日期'); saving.value = false; uploadingInline.value = false; return }
     }
   }
-
-  const isInline = !dialogVisible.value
-  if (isInline) uploadingInline.value = true
-  else saving.value = true
 
   try {
     const payload = { ...form.value, recordId: props.recordId }

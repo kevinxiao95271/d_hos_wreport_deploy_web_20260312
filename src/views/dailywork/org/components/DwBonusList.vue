@@ -80,7 +80,7 @@
             <div class="time-range-group">
               <div class="time-range-row">
                 <span class="time-range-side-label">开始</span>
-                <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+                <el-date-picker :key="`bs-start-${form.compEndDate}`" v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
                   :disabled-date="disabledAfter(form.compEndDate)" />
                 <el-select v-model="form.compStartHalf" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -88,7 +88,7 @@
               </div>
               <div class="time-range-row" style="margin-top:6px">
                 <span class="time-range-side-label">结束</span>
-                <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+                <el-date-picker :key="`bs-end-${form.compStartDate}`" v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
                   :disabled-date="disabledBefore(form.compStartDate)" />
                 <el-select v-model="form.compEndHalf" style="width:90px">
                   <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -167,7 +167,7 @@
           <div class="time-range-group">
             <div class="time-range-row">
               <span class="time-range-side-label">开始</span>
-              <el-date-picker v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
+              <el-date-picker :key="`b-start-${form.compEndDate}`" v-model="form.compStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" style="width:160px"
                 :disabled-date="disabledAfter(form.compEndDate)" />
               <el-select v-model="form.compStartHalf" style="width:90px">
                 <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -175,7 +175,7 @@
             </div>
             <div class="time-range-row" style="margin-top:6px">
               <span class="time-range-side-label">结束</span>
-              <el-date-picker v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
+              <el-date-picker :key="`b-end-${form.compStartDate}`" v-model="form.compEndDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" style="width:160px"
                 :disabled-date="disabledBefore(form.compStartDate)" />
               <el-select v-model="form.compEndHalf" style="width:90px">
                 <el-option label="上午" value="AM" /><el-option label="下午" value="PM" />
@@ -285,17 +285,25 @@ function openDialog(item) {
 }
 
 async function handleSave() {
-  await formRef.value?.validate()
-
-  if (props.bonusType === 'competition') {
-    const s = form.value.compStartDate, e = form.value.compEndDate
-    if (!s || !e) { ElMessage.warning('请填写举办开始和结束日期'); return }
-    if (s > e)    { ElMessage.warning('开始日期不能晚于结束日期'); return }
-  }
+  if (saving.value || uploadingInline.value) return
 
   const isInline = !dialogVisible.value
   if (isInline) uploadingInline.value = true
   else saving.value = true
+
+  try {
+    await formRef.value?.validate()
+  } catch {
+    saving.value = false
+    uploadingInline.value = false
+    return
+  }
+
+  if (props.bonusType === 'competition') {
+    const s = form.value.compStartDate, e = form.value.compEndDate
+    if (!s || !e) { ElMessage.warning('请填写举办开始和结束日期'); saving.value = false; uploadingInline.value = false; return }
+    if (s > e)    { ElMessage.warning('开始日期不能晚于结束日期'); saving.value = false; uploadingInline.value = false; return }
+  }
 
   try {
     const payload = { ...form.value }
