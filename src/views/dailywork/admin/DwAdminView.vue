@@ -24,10 +24,12 @@
             <div class="module-header-left">
               <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
               <span class="module-name-admin">{{ mod.moduleName }}</span>
-              <!-- 折叠时在标题旁显示得分概览 -->
-              <span v-if="mod.scoreMax != null && isCollapsed(mod.moduleKey)" class="header-score-badge">
-                得分 {{ moduleScores[mod.moduleKey]?.actualScore ?? '—' }} 分 / 总分 {{ mod.scoreMax }} 分
-              </span>
+              <!-- 折叠：满分 · 自评分 · 实际得分（横排，无分式样式） -->
+              <div v-if="mod.scoreMax != null && isCollapsed(mod.moduleKey)" class="score-strip score-strip--header">
+                <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
+                <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
+                <span class="score-field"><span class="score-field-label">实际得分</span><span class="score-field-val score-field-val--act">{{ moduleScores[mod.moduleKey]?.actualScore ?? '—' }}</span></span>
+              </div>
             </div>
             <div class="module-meta">
               <!-- 考核说明 -->
@@ -48,21 +50,24 @@
 
         <!-- 评分行（有 scoreMax 时显示） -->
         <div v-if="mod.scoreMax != null" class="score-input-bar">
-          <span class="score-bar-max">满分 {{ mod.scoreMax }} 分</span>
-          <span class="score-bar-sep"></span>
-          <span class="score-bar-label">实际得分</span>
-          <el-input-number
-            v-model="moduleScores[mod.moduleKey].actualScore"
-            :min="0"
-            :max="mod.scoreMax"
-            :precision="1"
-            :step="0.5"
-            size="small"
-            style="width:110px"
-            placeholder="得分"
-          />
-          <span class="score-bar-unit">分</span>
-          <span class="score-bar-sep"></span>
+          <div class="score-strip score-strip--bar">
+            <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
+            <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
+            <span class="score-field score-field--input">
+              <span class="score-field-label">实际得分</span>
+              <el-input-number
+                v-model="moduleScores[mod.moduleKey].actualScore"
+                :min="0"
+                :max="mod.scoreMax"
+                :precision="1"
+                :step="0.5"
+                size="small"
+                class="score-actual-input"
+                controls-position="right"
+              />
+            </span>
+          </div>
+          <span class="score-bar-sep score-bar-sep--after"></span>
           <span class="score-bar-label">备注</span>
           <el-input
             v-model="moduleScores[mod.moduleKey].remark"
@@ -80,14 +85,21 @@
 
         <!-- 多条记录型 -->
         <template v-if="isListModule(mod.moduleKey)">
-          <div v-if="getListItems(mod.moduleKey).length" class="collapse-scroll-wrap">
+          <div v-if="listItemsSortedForModule(mod.moduleKey).length" class="collapse-scroll-wrap">
           <el-collapse>
             <el-collapse-item
-              v-for="item in getListItems(mod.moduleKey)"
+              v-for="item in listItemsSortedForModule(mod.moduleKey)"
               :key="item.id"
               :name="item.id"
+              class="dw-admin-quarter-row"
+              :style="dwQuarterRowStyle(item)"
             >
-              <template #title>{{ itemTitle(mod.moduleKey, item) }}</template>
+              <template #title>
+                <span class="admin-collapse-title">
+                  <span>{{ itemTitle(mod.moduleKey, item) }}</span>
+                  <el-tag v-if="item.startYearQuarter" size="small" type="info" effect="plain">{{ item.startYearQuarter }}</el-tag>
+                </span>
+              </template>
               <el-descriptions :column="2" size="small" border>
                 <el-descriptions-item
                   v-for="(v, k) in flattenItem(mod.moduleKey, item)"
@@ -196,6 +208,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
+import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
 import DwReadonlyBonuses     from './components/DwReadonlyBonuses.vue'
@@ -221,6 +234,13 @@ function toggleModule(key) {
   collapsedKeys.value = s
 }
 function isCollapsed(key) { return collapsedKeys.value.has(key) }
+
+/** 机构填报的模块自评分（详情顶层 moduleSelfScores） */
+function moduleSelfScoreText(mod) {
+  const v = detail.value.moduleSelfScores?.[mod.moduleKey]
+  if (v === null || v === undefined || v === '') return '—'
+  return v
+}
 
 // 每模块评分状态
 const moduleScores = ref({})   // { [moduleKey]: { actualScore, remark } }
@@ -265,6 +285,11 @@ function getListItems(key) {
   return { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }[key]
     ? detail.value[{ meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }[key]] || []
     : []
+}
+
+/** 与后端顺序一致；兜底按开始时间倒序 + 季度行底色 */
+function listItemsSortedForModule(moduleKey) {
+  return sortDwSubRecordsByStartDesc(getListItems(moduleKey), moduleKey)
 }
 
 function getBonusItems(bonusType) {
@@ -316,6 +341,7 @@ function flattenItem(moduleKey, item) {
     'surveyStartHalf', 'surveyEndDate', 'surveyEndHalf',
     'compStartHalf', 'compEndDate', 'compEndHalf',
     'coverageRate',
+    'startYearQuarter', 'quarterIndex',
   ])
   const r = {}
 
@@ -399,16 +425,39 @@ onMounted(loadAll)
   flex-shrink: 0;
 }
 .toggle-icon.is-collapsed { transform: rotate(-90deg); }
-.header-score-badge {
+/* 满分 · 自评分 · 实际得分：横排字段，无分式样式 */
+.score-strip {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.score-strip--header {
+  margin-left: 8px;
+}
+.score-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.score-field-label {
   font-size: 12px;
-  font-weight: 600;
-  color: #e6a23c;
-  background: #fdf6ec;
-  border: 1px solid #f0b86b;
-  border-radius: 10px;
-  padding: 1px 8px;
+  color: #909399;
   white-space: nowrap;
 }
+.score-field-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  min-width: 1.5em;
+}
+.score-field-val--max { color: #b88230; }
+.score-field-val--self { color: #409eff; }
+.score-field-val--act { color: #e6a23c; }
+.score-field--input {
+  gap: 6px;
+}
+.score-actual-input { width: 110px; }
 
 /* 统一信息框：考核说明 + 评分规则共用结构，样式微差 */
 .meta-box {
@@ -451,7 +500,7 @@ onMounted(loadAll)
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px 12px;
   padding: 10px 14px;
   margin-bottom: 12px;
   background: #f0f7ff;
@@ -459,10 +508,9 @@ onMounted(loadAll)
   border-radius: 6px;
   font-size: 13px;
 }
-.score-bar-max  { font-weight: 600; color: #e6a23c; white-space: nowrap; }
-.score-bar-sep  { width: 1px; height: 16px; background: #dcdfe6; flex-shrink: 0; }
+.score-bar-sep  { width: 1px; height: 18px; background: #dcdfe6; flex-shrink: 0; }
+.score-bar-sep--after { margin: 0 2px; }
 .score-bar-label { color: #606266; white-space: nowrap; }
-.score-bar-unit  { color: #606266; }
 
 /* 记录列表局部滚动容器 */
 .collapse-scroll-wrap {
@@ -478,6 +526,20 @@ onMounted(loadAll)
 .collapse-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
+
+.admin-collapse-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.dw-admin-quarter-row :deep(.el-collapse-item__header) {
+  background-color: var(--quarter-bg, transparent) !important;
+}
+.dw-admin-quarter-row :deep(.el-collapse-item__wrap) {
+  background-color: rgba(255, 255, 255, 0.65);
+}
 
 /* guidance 县级分组 */
 .county-groups-wrap {

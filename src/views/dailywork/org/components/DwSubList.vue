@@ -8,13 +8,18 @@
       <div class="collapse-scroll-wrap">
       <el-collapse v-model="openIds">
         <el-collapse-item
-          v-for="item in items"
+          v-for="item in displayItems"
           :key="item.id"
           :name="item.id"
+          class="dw-sublist-quarter"
+          :style="dwQuarterRowStyle(item)"
         >
           <template #title>
             <div class="collapse-title">
-              <span class="item-title">{{ itemTitle(item) }}</span>
+              <div class="title-left">
+                <span class="item-title">{{ itemTitle(item) }}</span>
+                <el-tag v-if="item.startYearQuarter" size="small" type="info" effect="plain" class="quarter-tag">{{ item.startYearQuarter }}</el-tag>
+              </div>
               <div class="title-actions" @click.stop>
                 <el-button v-if="editable" type="primary" link size="small" @click="openEdit(item)">编辑</el-button>
                 <el-button v-if="editable" type="danger"  link size="small" :loading="deletingId === item.id" @click="handleDelete(item)">删除</el-button>
@@ -335,6 +340,7 @@ import {
 import DwAttachSlot  from './DwAttachSlot.vue'
 import DwExtraFields from './DwExtraFields.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
+import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
 
 const props = defineProps({
   moduleKey:    { type: String, required: true },
@@ -344,6 +350,9 @@ const props = defineProps({
   editable:     { type: Boolean, default: true },
 })
 const emit = defineEmits(['saved', 'deleted'])
+
+/** 与后端返回顺序一致；若接口未排序则按开始时间倒序兜底 */
+const displayItems = computed(() => sortDwSubRecordsByStartDesc(props.items, props.moduleKey))
 
 const previewRef      = ref(null)
 const dialogVisible   = ref(false)
@@ -679,8 +688,19 @@ async function handleDelete(item) {
 .collapse-title {
   display: flex; align-items: center;
   justify-content: space-between; width: 100%; padding-right: 12px;
+  gap: 10px;
 }
+.title-left    { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .item-title    { font-weight: 500; color: #303133; }
+.quarter-tag   { flex-shrink: 0; }
+
+/* 按季度着色：标题栏 + 展开区淡底 */
+.dw-sublist-quarter :deep(.el-collapse-item__header) {
+  background-color: var(--quarter-bg, transparent) !important;
+}
+.dw-sublist-quarter :deep(.el-collapse-item__wrap) {
+  background-color: rgba(255, 255, 255, 0.65);
+}
 .title-actions { display: flex; gap: 4px; }
 .attach-grid {
   display: grid;

@@ -26,9 +26,10 @@
             <div class="module-header-left">
               <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
               <span class="module-name">{{ mod.moduleName }}</span>
-              <span v-if="mod.scoreMax" class="header-self-score-badge">
-                自评分 {{ moduleSelfScores[mod.moduleKey] ?? '—' }} / 满分 {{ mod.scoreMax }}
-              </span>
+              <div v-if="mod.scoreMax" class="score-strip score-strip--header">
+                <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
+                <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScores[mod.moduleKey] ?? '—' }}</span></span>
+              </div>
             </div>
             <div v-if="mod.scoreDesc" class="module-score-desc">
               <span class="score-desc-label">考核说明</span>
@@ -41,13 +42,19 @@
 
         <!-- 模块自评分输入行 -->
         <div v-if="editable && mod.scoreMax" class="module-self-score-editor" @click.stop>
-          <span class="self-score-label">项目自评分</span>
-          <el-input-number
-            v-model="moduleSelfScores[mod.moduleKey]"
-            :min="0" :max="mod.scoreMax" :precision="1" :step="0.5"
-            size="small" style="width:130px"
-          />
-          <span class="self-score-unit">/ {{ mod.scoreMax }} 分</span>
+          <div class="score-strip score-strip--bar">
+            <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
+            <span class="score-field score-field--input">
+              <span class="score-field-label">自评分</span>
+              <el-input-number
+                v-model="moduleSelfScores[mod.moduleKey]"
+                :min="0" :max="mod.scoreMax" :precision="1" :step="0.5"
+                size="small"
+                class="self-score-input"
+                controls-position="right"
+              />
+            </span>
+          </div>
           <el-button
             size="small" type="primary"
             :loading="savingSelfScoreKey === mod.moduleKey"
@@ -329,35 +336,50 @@ onMounted(loadAll)
   color: #606266;
   line-height: 1.5;
 }
-.header-self-score-badge {
+/* 满分 · 自评分：横排（机构端无实际得分） */
+.score-strip {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
-  color: #fff;
-  background: #409eff;
-  border-radius: 10px;
-  padding: 2px 10px;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.score-strip--header {
   margin-left: 8px;
+}
+.score-strip--bar {
+  flex: 1;
+  min-width: 0;
+}
+.score-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.score-field-label {
+  font-size: 12px;
+  color: #909399;
   white-space: nowrap;
 }
+.score-field-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  min-width: 1.5em;
+}
+.score-field-val--max { color: #b88230; }
+.score-field-val--self { color: #409eff; }
+.score-field--input { gap: 6px; }
+.self-score-input { width: 120px; }
+
 .module-self-score-editor {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   padding: 8px 12px;
   margin-bottom: 12px;
   background: #f5f7fa;
   border-radius: 6px;
   border: 1px solid #e4e7ed;
-}
-.self-score-label {
-  font-size: 13px;
-  color: #606266;
-  white-space: nowrap;
-}
-.self-score-unit {
-  font-size: 13px;
-  color: #909399;
-  white-space: nowrap;
 }
 </style>
