@@ -89,8 +89,8 @@
           <el-collapse>
             <el-collapse-item
               v-for="item in listItemsSortedForModule(mod.moduleKey)"
-              :key="item.id"
-              :name="item.id"
+              :key="String(item.id)"
+              :name="String(item.id)"
               class="dw-admin-quarter-row"
               :style="dwQuarterRowStyle(item)"
             >
@@ -164,10 +164,10 @@
         <!-- 经费执行 -->
         <template v-else-if="mod.moduleKey === 'funding'">
           <el-descriptions :column="2" size="small" border>
-            <el-descriptions-item label="财政专项有拨款">{{ detail.funding?.fiscalHasFund ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item v-if="detail.funding?.fiscalHasFund" label="财政执行率">{{ detail.funding?.fiscalExecutionRate }}%</el-descriptions-item>
-            <el-descriptions-item label="医院自筹有拨款">{{ detail.funding?.hospitalHasFund ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item v-if="detail.funding?.hospitalHasFund" label="医院执行率">{{ detail.funding?.hospitalExecutionRate }}%</el-descriptions-item>
+            <el-descriptions-item label="财政专项拨款（万元）">{{ detail.funding?.fiscalAppropriationWan ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item label="财政执行率">{{ detail.funding?.fiscalExecutionRate ?? '—' }}%</el-descriptions-item>
+            <el-descriptions-item label="医院自筹拨款（万元）">{{ detail.funding?.hospitalAppropriationWan ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item label="医院执行率">{{ detail.funding?.hospitalExecutionRate ?? '—' }}%</el-descriptions-item>
           </el-descriptions>
         </template>
 

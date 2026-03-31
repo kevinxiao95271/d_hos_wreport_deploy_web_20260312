@@ -1,13 +1,17 @@
 <!-- 经费执行模块 -->
 <template>
   <el-form :model="form" label-width="160px" style="max-width:560px">
-    <el-form-item label="财政专项是否有拨款">
-      <el-radio-group v-model="form.fiscalHasFund" :disabled="!editable">
-        <el-radio :label="true">是</el-radio>
-        <el-radio :label="false">否</el-radio>
-      </el-radio-group>
+    <el-form-item label="财政专项拨款（万元）">
+      <el-input-number
+        v-model="form.fiscalAppropriationWan"
+        :min="0"
+        :precision="2"
+        :disabled="!editable"
+        style="width:200px"
+      />
     </el-form-item>
-    <el-form-item v-if="form.fiscalHasFund" label="财政专项执行率(%)">
+
+    <el-form-item label="财政执行率（%）">
       <el-input-number
         v-model="form.fiscalExecutionRate"
         :min="0" :max="100" :precision="1"
@@ -16,13 +20,17 @@
       />
     </el-form-item>
 
-    <el-form-item label="医院自筹是否有拨款">
-      <el-radio-group v-model="form.hospitalHasFund" :disabled="!editable">
-        <el-radio :label="true">是</el-radio>
-        <el-radio :label="false">否</el-radio>
-      </el-radio-group>
+    <el-form-item label="医院自筹拨款（万元）">
+      <el-input-number
+        v-model="form.hospitalAppropriationWan"
+        :min="0"
+        :precision="2"
+        :disabled="!editable"
+        style="width:200px"
+      />
     </el-form-item>
-    <el-form-item v-if="form.hospitalHasFund" label="医院自筹执行率(%)">
+
+    <el-form-item label="医院执行率（%）">
       <el-input-number
         v-model="form.hospitalExecutionRate"
         :min="0" :max="100" :precision="1"
@@ -62,11 +70,22 @@ const props = defineProps({
 const emit = defineEmits(['saved'])
 
 const saving     = ref(false)
-const form       = ref({ fiscalHasFund: null, hospitalHasFund: null, fiscalExecutionRate: null, hospitalExecutionRate: null })
+const form = ref({
+  fiscalAppropriationWan: null,
+  fiscalExecutionRate: null,
+  hospitalAppropriationWan: null,
+  hospitalExecutionRate: null,
+})
 const extraLocal = ref({})
 
 watch(() => props.funding, (v) => {
-  if (v) form.value = { ...v }
+  if (!v) return
+  form.value = {
+    fiscalAppropriationWan: v.fiscalAppropriationWan ?? null,
+    fiscalExecutionRate: v.fiscalExecutionRate ?? null,
+    hospitalAppropriationWan: v.hospitalAppropriationWan ?? null,
+    hospitalExecutionRate: v.hospitalExecutionRate ?? null,
+  }
 }, { immediate: true })
 
 watch(() => props.extraValues, (v) => {
@@ -76,7 +95,14 @@ watch(() => props.extraValues, (v) => {
 async function handleSave() {
   saving.value = true
   try {
-    await saveFunding({ ...form.value, recordId: props.recordId })
+    const payload = {
+      recordId: props.recordId,
+      fiscalAppropriationWan: form.value.fiscalAppropriationWan,
+      fiscalExecutionRate: form.value.fiscalExecutionRate,
+      hospitalAppropriationWan: form.value.hospitalAppropriationWan,
+      hospitalExecutionRate: form.value.hospitalExecutionRate,
+    }
+    await saveFunding(payload)
     if (Object.keys(extraLocal.value).length) {
       await saveDwFieldValues({ recordId: String(props.recordId), moduleKey: 'funding', values: extraLocal.value })
     }

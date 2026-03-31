@@ -9,8 +9,8 @@
       <el-collapse v-model="openIds">
         <el-collapse-item
           v-for="item in displayItems"
-          :key="item.id"
-          :name="item.id"
+          :key="collapseItemId(item)"
+          :name="collapseItemId(item)"
           class="dw-sublist-quarter"
           :style="dwQuarterRowStyle(item)"
         >
@@ -457,6 +457,12 @@ const displayFields = computed(() => {
 const slotDef = computed(() => SLOT_DEF[props.moduleKey] || [])
 
 const FORM_LABEL = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget' }
+
+/** 折叠面板 name 必须用字符串，避免 Snowflake id 超过 Number 安全整数时与 v-model 对不上、无法展开 */
+function collapseItemId(item) {
+  return item?.id != null ? String(item.id) : ''
+}
+
 function itemTitle(item) {
   return item[FORM_LABEL[props.moduleKey]] || `记录 ${item.id}`
 }
@@ -543,8 +549,13 @@ function initBlankForm() {
 watch(() => props.items, (newItems) => {
   if (pendingOpenId.value) {
     const match = newItems.find(i => String(i.id) === String(pendingOpenId.value))
-    if (match) { openIds.value = [match.id]; pendingOpenId.value = null }
+    if (match) {
+      openIds.value = [String(match.id)]
+      pendingOpenId.value = null
+    }
   }
+  const idSet = new Set(newItems.map(i => String(i.id)))
+  openIds.value = openIds.value.filter(id => idSet.has(String(id)))
   if (newItems.length === 0) initBlankForm()
 }, { deep: false })
 
@@ -652,7 +663,7 @@ async function handleSave() {
       } else {
         ElMessage.success('保存成功')
       }
-      pendingOpenId.value = savedId
+      pendingOpenId.value = savedId != null ? String(savedId) : null
     } else {
       ElMessage.success('保存成功')
     }
