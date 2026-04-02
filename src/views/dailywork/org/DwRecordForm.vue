@@ -209,12 +209,10 @@ function getListItems(key) {
   }))
   // 年度任务：把 Q1-Q4 已通过条目混入前方（灰态）
   if (isAnnualTask.value && QUARTERLY_MODULES.includes(key)) {
-    const sk = { meeting: 'meetingStartDate', training: 'trainingStartDate', guidance: 'guidanceStartDate', survey: 'surveyStartDate' }[key]
     const quarterly = yearSummaryRows.value.flatMap(row =>
       (row.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({ ...i, _readOnly: true, _fromQuarter: row.statQuarter }))
     )
-    const sortedQ = sk ? [...quarterly].sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : quarterly
-    return [...sortedQ, ...own]
+    return [...quarterly, ...own]
   }
   return own
 }

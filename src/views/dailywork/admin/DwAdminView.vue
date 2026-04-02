@@ -310,22 +310,17 @@ function getListItems(key) {
   const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _readOnly: false, _fromQuarter: null }))
   // 年度任务：把 Q1-Q4 已通过条目混入前方（灰态）
   if (isAnnualTask.value && QUARTERLY_MODULES.includes(key)) {
-    const sk = { meeting: 'meetingStartDate', training: 'trainingStartDate', guidance: 'guidanceStartDate', survey: 'surveyStartDate' }[key]
     const quarterly = yearSummaryRows.value.flatMap(row =>
       (row.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({ ...i, _readOnly: true, _fromQuarter: row.statQuarter }))
     )
-    const sortedQ = sk ? [...quarterly].sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : quarterly
-    return [...sortedQ, ...own]
+    return [...quarterly, ...own]
   }
   return own
 }
 
-/** 与后端顺序一致；年度任务已在 getListItems 内完成排序（季度在前），普通/季度任务兜底倒序 */
+/** 所有条目统一按开始日期降序（季度参考与年度自身一起排） */
 function listItemsSortedForModule(moduleKey) {
-  const items = getListItems(moduleKey)
-  // 年度任务：已分段排序（Q1→Q4 升序 + 年度自身），保持不变
-  if (isAnnualTask.value && QUARTERLY_MODULES.includes(moduleKey)) return items
-  return sortDwSubRecordsByStartDesc(items, moduleKey)
+  return sortDwSubRecordsByStartDesc(getListItems(moduleKey), moduleKey)
 }
 
 function getBonusItems(bonusType) {

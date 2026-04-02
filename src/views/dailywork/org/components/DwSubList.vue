@@ -369,16 +369,11 @@ const START_DATE_KEY = {
   guidance: 'guidanceStartDate', survey: 'surveyStartDate',
 }
 
-/**
- * _readOnly=true（季度参考条目）升序排前（Q1 最先）
- * 年度任务自身条目排后，按开始日期降序
- */
+/** 所有条目（季度参考 + 年度自身）统一按开始日期降序 */
 const displayItems = computed(() => {
-  const ro = props.items.filter(i =>  i._readOnly)
-  const ed = props.items.filter(i => !i._readOnly)
   const sk = START_DATE_KEY[props.moduleKey]
-  const sortedRo = sk ? [...ro].sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : ro
-  return [...sortedRo, ...sortDwSubRecordsByStartDesc(ed, props.moduleKey)]
+  const all = [...props.items]
+  return sk ? all.sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : all
 })
 
 const previewRef      = ref(null)

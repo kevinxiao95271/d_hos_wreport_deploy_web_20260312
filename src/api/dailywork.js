@@ -11,7 +11,7 @@ export const addDwField         = (data)   => request.post('/dw/config/field/add
 export const updateDwField      = (data)   => request.post('/dw/config/field/update', data)
 export const deleteDwField      = (id)     => request.post(`/dw/config/field/delete/${id}`)
 /** 模块级/子记录扩展字段与自评分（module_self_score）保存；自评分时 subRecordId 传 null */
-export const saveDwFieldValues  = (data)   => request.post('/dw/record/field-values', data)
+export const saveDwFieldValues  = (data)   => request.post('/dw/config/field/values/save', data)
 
 // ── 记录初始化 / 读取 ─────────────────────────────────────────
 export const initDwRecord  = (taskId)    => request.get(`/dw/record/init/${taskId}`)
