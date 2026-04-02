@@ -91,13 +91,22 @@
               v-for="item in listItemsSortedForModule(mod.moduleKey)"
               :key="String(item.id)"
               :name="String(item.id)"
-              class="dw-admin-quarter-row"
+              :class="['dw-admin-quarter-row', { 'dw-admin-readonly-row': item._readOnly }]"
               :style="dwQuarterRowStyle(item)"
             >
               <template #title>
                 <span class="admin-collapse-title">
-                  <span>{{ itemTitle(mod.moduleKey, item) }}</span>
-                  <el-tag v-if="item.startYearQuarter" size="small" type="info" effect="plain">{{ item.startYearQuarter }}</el-tag>
+                  <span class="admin-title-main">
+                    <span>{{ itemTitle(mod.moduleKey, item) }}</span>
+                    <el-tag v-if="item.startYearQuarter && item._fromQuarter == null" size="small" type="info" effect="plain">{{ item.startYearQuarter }}</el-tag>
+                  </span>
+                  <el-tag
+                    v-if="item._fromQuarter != null"
+                    size="small"
+                    :type="['','primary','success','warning','danger'][item._fromQuarter] || 'info'"
+                    effect="dark"
+                    class="admin-q-badge"
+                  >Q{{ item._fromQuarter }} 季度上报</el-tag>
                 </span>
               </template>
               <el-descriptions :column="2" size="small" border>
@@ -207,7 +216,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, ArrowDown } from '@element-plus/icons-vue'
-import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
+import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore, getDwYearSummary } from '@/api/dailywork'
 import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
@@ -223,8 +232,24 @@ const detail   = ref({})
 const auditRemark = ref('')
 const previewRef  = ref(null)
 
-const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
-const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnabled))
+const LIST_MODULES      = ['meeting', 'training', 'guidance', 'survey']
+const QUARTERLY_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const DETAIL_KEY        = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
+const yearSummaryRows   = ref([])
+const enabledModules = computed(() => {
+  const all = (modules.value || []).filter(m => m.isEnabled)
+  const keys = detail.value.enabledModuleKeys
+  if (Array.isArray(keys) && keys.length) {
+    const set = new Set(keys)
+    return all.filter(m => set.has(m.moduleKey))
+  }
+  return all
+})
+
+/** 年度任务：statQuarter=null + taskType=daily_work */
+const isAnnualTask = computed(() =>
+  detail.value.taskType === 'daily_work' && detail.value.statQuarter == null && !!detail.value.statYear
+)
 
 // 模块折叠状态
 const collapsedKeys = ref(new Set())
@@ -282,14 +307,25 @@ function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' }
 
 function getListItems(key) {
-  return { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }[key]
-    ? detail.value[{ meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }[key]] || []
-    : []
+  const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _readOnly: false, _fromQuarter: null }))
+  // 年度任务：把 Q1-Q4 已通过条目混入前方（灰态）
+  if (isAnnualTask.value && QUARTERLY_MODULES.includes(key)) {
+    const sk = { meeting: 'meetingStartDate', training: 'trainingStartDate', guidance: 'guidanceStartDate', survey: 'surveyStartDate' }[key]
+    const quarterly = yearSummaryRows.value.flatMap(row =>
+      (row.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({ ...i, _readOnly: true, _fromQuarter: row.statQuarter }))
+    )
+    const sortedQ = sk ? [...quarterly].sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : quarterly
+    return [...sortedQ, ...own]
+  }
+  return own
 }
 
-/** 与后端顺序一致；兜底按开始时间倒序 + 季度行底色 */
+/** 与后端顺序一致；年度任务已在 getListItems 内完成排序（季度在前），普通/季度任务兜底倒序 */
 function listItemsSortedForModule(moduleKey) {
-  return sortDwSubRecordsByStartDesc(getListItems(moduleKey), moduleKey)
+  const items = getListItems(moduleKey)
+  // 年度任务：已分段排序（Q1→Q4 升序 + 年度自身），保持不变
+  if (isAnnualTask.value && QUARTERLY_MODULES.includes(moduleKey)) return items
+  return sortDwSubRecordsByStartDesc(items, moduleKey)
 }
 
 function getBonusItems(bonusType) {
@@ -389,6 +425,12 @@ async function loadAll() {
     modules.value = modRes.data    || []
     detail.value  = detailRes.data || {}
     initModuleScores(modules.value)
+    // 年度任务：加载已通过季度数据，供各模块混入展示（灰态只读）
+    if (isAnnualTask.value && detail.value.statYear) {
+      const orgId = detail.value.orgId ? String(detail.value.orgId) : null
+      const res = await getDwYearSummary({ statYear: detail.value.statYear, approvedOnly: true, orgId }).catch(() => ({ data: [] }))
+      yearSummaryRows.value = (res.data || []).filter(r => r.statQuarter != null && r.detail)
+    }
   } finally { loading.value = false }
 }
 
@@ -530,16 +572,22 @@ onMounted(loadAll)
 .admin-collapse-title {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
   width: 100%;
+  padding-right: 8px;
 }
+.admin-title-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.admin-q-badge    { font-weight: 700; flex-shrink: 0; }
 .dw-admin-quarter-row :deep(.el-collapse-item__header) {
   background-color: var(--quarter-bg, transparent) !important;
 }
 .dw-admin-quarter-row :deep(.el-collapse-item__wrap) {
   background-color: rgba(255, 255, 255, 0.65);
 }
+.dw-admin-readonly-row { opacity: 0.72; filter: grayscale(0.15); }
+.dw-admin-readonly-row :deep(.el-collapse-item__header) { cursor: default; }
+
 
 /* guidance 县级分组 */
 .county-groups-wrap {

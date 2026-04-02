@@ -152,7 +152,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { getDwModules, initDwRecord, getDwRecord, submitDwRecord, saveDwFieldValues } from '@/api/dailywork'
+import { getDwModules, initDwRecord, getDwRecord, submitDwRecord, saveDwFieldValues, getDwYearSummary } from '@/api/dailywork'
 import DwSubList    from './components/DwSubList.vue'
 import DwBonusList  from './components/DwBonusList.vue'
 import DwFundingForm from './components/DwFundingForm.vue'
@@ -167,10 +167,26 @@ const detail      = ref({ status: 0, meetings: [], trainings: [], guidances: [],
 const moduleSelfScores   = ref({})
 const savingSelfScoreKey = ref(null)
 
-const LIST_MODULES   = ['meeting', 'training', 'guidance', 'survey']
-const FILE_MODULES   = ['annual_work', 'it_construction', 'work_plan', 'admin_response', 'activity_report']
+const LIST_MODULES      = ['meeting', 'training', 'guidance', 'survey']
+const FILE_MODULES      = ['annual_work', 'it_construction', 'work_plan', 'admin_response', 'activity_report']
+const QUARTERLY_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const DETAIL_KEY        = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
 
-const enabledModules = computed(() => (modules.value || []).filter(m => m.isEnabled))
+const yearSummaryRows = ref([])
+
+const enabledModules = computed(() => {
+  const all = (modules.value || []).filter(m => m.isEnabled)
+  const keys = detail.value.enabledModuleKeys
+  if (Array.isArray(keys) && keys.length) {
+    const set = new Set(keys)
+    return all.filter(m => set.has(m.moduleKey))
+  }
+  return all
+})
+
+/** 年度任务（statQuarter=null）：旁挂季度参考面板 */
+const isAnnualTask = computed(() => detail.value.taskType === 'daily_work' && detail.value.statQuarter == null && !!detail.value.statYear)
+
 const editable       = computed(() => detail.value.status === 0 || detail.value.status === 3)
 
 // 模块折叠状态
@@ -188,13 +204,19 @@ function isBonusModule(key) {
 }
 
 function getListItems(key) {
-  const map = {
-    meeting: detail.value.meetings,
-    training: detail.value.trainings,
-    guidance: detail.value.guidances,
-    survey:   detail.value.surveys,
+  const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({
+    ...i, _readOnly: detail.value.readOnly === true, _fromQuarter: null,
+  }))
+  // 年度任务：把 Q1-Q4 已通过条目混入前方（灰态）
+  if (isAnnualTask.value && QUARTERLY_MODULES.includes(key)) {
+    const sk = { meeting: 'meetingStartDate', training: 'trainingStartDate', guidance: 'guidanceStartDate', survey: 'surveyStartDate' }[key]
+    const quarterly = yearSummaryRows.value.flatMap(row =>
+      (row.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({ ...i, _readOnly: true, _fromQuarter: row.statQuarter }))
+    )
+    const sortedQ = sk ? [...quarterly].sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : quarterly
+    return [...sortedQ, ...own]
   }
-  return map[key] || []
+  return own
 }
 
 function getBonusItems(bonusType) {
@@ -212,7 +234,6 @@ async function loadAll() {
     modules.value = modRes.data || []
     const initData = initRes.data || {}
     detail.value = initData
-    // initDwRecord already returns moduleSelfScores; also fetch via getDwRecord for freshness
     if (initData.recordId) {
       const recRes = await getDwRecord(initData.recordId)
       const rec = recRes.data || {}
@@ -220,6 +241,11 @@ async function loadAll() {
       initModuleSelfScores(rec.moduleSelfScores)
     } else {
       initModuleSelfScores(initData.moduleSelfScores)
+    }
+    // 年度任务：加载已通过季度数据，供各模块混入展示（灰态只读）
+    if (isAnnualTask.value && detail.value.statYear) {
+      const res = await getDwYearSummary({ statYear: detail.value.statYear, approvedOnly: true }).catch(() => ({ data: [] }))
+      yearSummaryRows.value = (res.data || []).filter(r => r.statQuarter != null && r.detail)
     }
   } finally {
     pageLoading.value = false
@@ -241,6 +267,7 @@ async function reloadDetail() {
     }
   } catch { /* ignore */ }
 }
+
 
 async function saveModuleSelfScore(mod) {
   const score = moduleSelfScores.value[mod.moduleKey]

@@ -11,18 +11,27 @@
           v-for="item in displayItems"
           :key="collapseItemId(item)"
           :name="collapseItemId(item)"
-          class="dw-sublist-quarter"
+          :class="['dw-sublist-quarter', { 'dw-sublist-readonly': item._readOnly }]"
           :style="dwQuarterRowStyle(item)"
         >
           <template #title>
             <div class="collapse-title">
               <div class="title-left">
                 <span class="item-title">{{ itemTitle(item) }}</span>
-                <el-tag v-if="item.startYearQuarter" size="small" type="info" effect="plain" class="quarter-tag">{{ item.startYearQuarter }}</el-tag>
+                <el-tag v-if="item.startYearQuarter && item._fromQuarter == null" size="small" type="info" effect="plain" class="quarter-tag">{{ item.startYearQuarter }}</el-tag>
               </div>
-              <div class="title-actions" @click.stop>
-                <el-button v-if="editable" type="primary" link size="small" @click="openEdit(item)">编辑</el-button>
-                <el-button v-if="editable" type="danger"  link size="small" :loading="deletingId === item.id" @click="handleDelete(item)">删除</el-button>
+              <div class="title-right">
+                <el-tag
+                  v-if="item._fromQuarter != null"
+                  size="small"
+                  :type="quarterTagType(item._fromQuarter)"
+                  effect="dark"
+                  class="q-source-badge"
+                >Q{{ item._fromQuarter }} 季度上报</el-tag>
+                <div class="title-actions" @click.stop>
+                  <el-button v-if="editable && !item._readOnly" type="primary" link size="small" @click="openEdit(item)">编辑</el-button>
+                  <el-button v-if="editable && !item._readOnly" type="danger"  link size="small" :loading="deletingId === item.id" @click="handleDelete(item)">删除</el-button>
+                </div>
               </div>
             </div>
           </template>
@@ -81,7 +90,7 @@
               :module-type="moduleKey"
               :slot_="s.slot"
               :sub-record-id="item.id"
-              :editable="editable"
+              :editable="editable && !item._readOnly"
               :label="s.label"
               :accept="s.accept"
               :format-hint="s.hint"
@@ -351,8 +360,26 @@ const props = defineProps({
 })
 const emit = defineEmits(['saved', 'deleted'])
 
-/** 与后端返回顺序一致；若接口未排序则按开始时间倒序兜底 */
-const displayItems = computed(() => sortDwSubRecordsByStartDesc(props.items, props.moduleKey))
+// 季度来源角标颜色：Q1=primary Q2=success Q3=warning Q4=danger
+const QUARTER_TAG_TYPE = ['', 'primary', 'success', 'warning', 'danger']
+function quarterTagType(q) { return QUARTER_TAG_TYPE[q] || 'info' }
+
+const START_DATE_KEY = {
+  meeting: 'meetingStartDate', training: 'trainingStartDate',
+  guidance: 'guidanceStartDate', survey: 'surveyStartDate',
+}
+
+/**
+ * _readOnly=true（季度参考条目）升序排前（Q1 最先）
+ * 年度任务自身条目排后，按开始日期降序
+ */
+const displayItems = computed(() => {
+  const ro = props.items.filter(i =>  i._readOnly)
+  const ed = props.items.filter(i => !i._readOnly)
+  const sk = START_DATE_KEY[props.moduleKey]
+  const sortedRo = sk ? [...ro].sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : ro
+  return [...sortedRo, ...sortDwSubRecordsByStartDesc(ed, props.moduleKey)]
+})
 
 const previewRef      = ref(null)
 const dialogVisible   = ref(false)
@@ -709,9 +736,21 @@ async function handleDelete(item) {
   justify-content: space-between; width: 100%; padding-right: 12px;
   gap: 10px;
 }
-.title-left    { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
-.item-title    { font-weight: 500; color: #303133; }
-.quarter-tag   { flex-shrink: 0; }
+.title-left  { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.title-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.item-title  { font-weight: 500; color: #303133; }
+.quarter-tag { flex-shrink: 0; }
+
+/* 季度参考条目（只读）：灰色调 */
+.dw-sublist-readonly :deep(.el-collapse-item__header) {
+  opacity: 0.75;
+  filter: grayscale(0.2);
+}
+.dw-sublist-readonly :deep(.el-collapse-item__wrap) {
+  opacity: 0.75;
+  pointer-events: none;
+}
+.q-source-badge { font-size: 11px; font-weight: 700; flex-shrink: 0; }
 
 /* 按季度着色：标题栏 + 展开区淡底 */
 .dw-sublist-quarter :deep(.el-collapse-item__header) {
@@ -720,6 +759,7 @@ async function handleDelete(item) {
 .dw-sublist-quarter :deep(.el-collapse-item__wrap) {
   background-color: rgba(255, 255, 255, 0.65);
 }
+
 .title-actions { display: flex; gap: 4px; }
 .attach-grid {
   display: grid;

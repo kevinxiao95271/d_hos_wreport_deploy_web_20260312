@@ -34,7 +34,10 @@
         <el-table-column prop="taskName" label="任务名称" min-width="200" />
         <el-table-column label="类型/模板" min-width="160">
           <template #default="{ row }">
-            <el-tag v-if="row.taskType === 'daily_work'" type="success" size="small">日常工作</el-tag>
+            <template v-if="row.taskType === 'daily_work'">
+              <el-tag v-if="row.statQuarter == null" type="warning" size="small">年度任务</el-tag>
+              <el-tag v-else type="success" size="small">Q{{ row.statQuarter }} 季度任务</el-tag>
+            </template>
             <span v-else>{{ templateMap[row.templateId] || row.templateId || '—' }}</span>
           </template>
         </el-table-column>
@@ -90,8 +93,22 @@
           <el-alert type="info" :closable="false" show-icon
             title="日常工作任务使用内置固定模块，无需选择模板" style="padding:6px 12px" />
         </el-form-item>
-        <el-form-item label="统计年度">
+        <el-form-item v-if="form.taskType === 'daily_work'" label="任务周期">
+          <el-radio-group v-model="form.dwPeriod" :disabled="!!editData">
+            <el-radio label="quarter">季度任务（Q1–Q4）</el-radio>
+            <el-radio label="annual">年度任务（全年汇总）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.taskType === 'daily_work'" label="统计年度" prop="statYear">
           <el-date-picker v-model="form.statYear" type="year" value-format="YYYY" style="width:100%" />
+        </el-form-item>
+        <el-form-item v-if="form.taskType === 'daily_work' && form.dwPeriod === 'quarter'" label="统计季度" prop="statQuarter">
+          <el-select v-model="form.statQuarter" placeholder="请选择季度" style="width:100%" :disabled="!!editData">
+            <el-option label="第一季度（Q1）" :value="1" />
+            <el-option label="第二季度（Q2）" :value="2" />
+            <el-option label="第三季度（Q3）" :value="3" />
+            <el-option label="第四季度（Q4）" :value="4" />
+          </el-select>
         </el-form-item>
         <el-form-item label="截止日期">
           <el-date-picker v-model="form.deadline" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" />
@@ -140,11 +157,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTaskPage, addTask, updateTask, deleteTask, updateTaskStatus, getTaskScope, setTaskScope } from '@/api/task'
+import { setDwTaskModules } from '@/api/dailywork'
 import { getTemplateList } from '@/api/template'
 import { getUsers } from '@/api/auth'
+
+const DW_QUARTER_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const DW_ALL_MODULES = [
+  'meeting', 'training', 'guidance', 'survey',
+  'annual_work', 'it_construction', 'work_plan', 'admin_response',
+  'activity_report', 'funding', 'bonus_pub', 'bonus_comp'
+]
 
 const loading = ref(false)
 const list = ref([])
@@ -155,13 +180,24 @@ const drawerVisible = ref(false)
 const submitting = ref(false)
 const editData = ref(null)
 const formRef = ref()
-const form = reactive({ taskType: 'normal', taskName: '', templateId: '', statYear: '', deadline: '', remark: '' })
+// dwPeriod: 'quarter' | 'annual'（仅 daily_work 时有效）
+const form = reactive({ taskType: 'normal', dwPeriod: 'quarter', taskName: '', templateId: '', statYear: '', statQuarter: null, deadline: '', remark: '' })
 const rules = computed(() => ({
-  taskName:   [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  templateId: form.taskType === 'normal'
+  taskName:    [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
+  templateId:  form.taskType === 'normal'
     ? [{ required: true, message: '请选择关联模板', trigger: 'change' }]
     : [],
+  statYear:    form.taskType === 'daily_work'
+    ? [{ required: true, message: '请选择统计年度', trigger: 'change' }]
+    : [],
+  statQuarter: (form.taskType === 'daily_work' && form.dwPeriod === 'quarter')
+    ? [{ required: true, message: '请选择统计季度', trigger: 'change' }]
+    : [],
 }))
+
+watch(() => form.dwPeriod, (p) => {
+  if (p === 'annual') form.statQuarter = null
+})
 
 const templateList = ref([])
 const templateMap = computed(() => {
@@ -225,9 +261,19 @@ function resetQuery() { query.taskName = ''; query.status = null; query.statYear
 function openDrawer(row) {
   editData.value = row
   if (row) {
-    Object.assign(form, { taskType: row.taskType || 'normal', taskName: row.taskName, templateId: row.templateId, statYear: row.statYear, deadline: row.deadline, remark: row.remark })
+    const dwPeriod = (row.taskType === 'daily_work' && row.statQuarter == null) ? 'annual' : 'quarter'
+    Object.assign(form, {
+      taskType: row.taskType || 'normal',
+      dwPeriod,
+      taskName: row.taskName,
+      templateId: row.templateId || '',
+      statYear: row.statYear || '',
+      statQuarter: row.statQuarter ?? null,
+      deadline: row.deadline || '',
+      remark: row.remark || '',
+    })
   } else {
-    Object.assign(form, { taskType: 'normal', taskName: '', templateId: '', statYear: '', deadline: '', remark: '' })
+    Object.assign(form, { taskType: 'normal', dwPeriod: 'quarter', taskName: '', templateId: '', statYear: '', statQuarter: null, deadline: '', remark: '' })
   }
   drawerVisible.value = true
 }
@@ -236,12 +282,29 @@ async function handleSubmit() {
   try { await formRef.value.validate() } catch { return }
   submitting.value = true
   try {
+    const payload = {
+      taskName:    form.taskName,
+      taskType:    form.taskType,
+      templateId:  form.taskType === 'normal' ? form.templateId : undefined,
+      statYear:    form.taskType === 'daily_work' ? form.statYear : undefined,
+      statQuarter: (form.taskType === 'daily_work' && form.dwPeriod === 'quarter') ? Number(form.statQuarter) : null,
+      deadline:    form.deadline,
+      remark:      form.remark,
+    }
+    let taskId
     if (editData.value) {
-      await updateTask({ id: editData.value.id, ...form })
+      await updateTask({ id: editData.value.id, ...payload })
+      taskId = editData.value.id
       ElMessage.success('编辑成功')
     } else {
-      await addTask(form)
+      const res = await addTask(payload)
+      taskId = res.data
       ElMessage.success('创建成功')
+    }
+    // 日常工作任务：自动设置模块范围
+    if (form.taskType === 'daily_work' && taskId) {
+      const moduleKeys = form.dwPeriod === 'annual' ? DW_ALL_MODULES : DW_QUARTER_MODULES
+      await setDwTaskModules(taskId, moduleKeys).catch(() => {})
     }
     drawerVisible.value = false
     loadList()

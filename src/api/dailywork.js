@@ -2,6 +2,10 @@ import request from '@/utils/request'
 
 // ── 模块配置 ──────────────────────────────────────────────────
 export const getDwModules       = ()       => request.get('/dw/config/modules')
+/** 查询某任务已启用的模块 key 列表 */
+export const getDwTaskModules   = (taskId) => request.get(`/dw/config/task-modules/${taskId}`)
+/** 设置某任务启用的模块范围（管理员） */
+export const setDwTaskModules   = (taskId, keys) => request.post(`/dw/config/task-modules/${taskId}`, keys)
 export const updateDwModule     = (data)   => request.post('/dw/config/module/update', data)
 export const addDwField         = (data)   => request.post('/dw/config/field/add', data)
 export const updateDwField      = (data)   => request.post('/dw/config/field/update', data)
@@ -50,3 +54,6 @@ export const getGuidanceRegions = () => request.get('/dw/config/guidance/regions
 // 模块评分（管理员）
 export const saveDwModuleScore = (data) => request.post('/dw/record/module/score/save', data)
 // data: { recordId, moduleKey, actualScore, scoreRemark }
+
+/** 年度汇总（管理端传 orgId；机构端不传自动取当前机构） */
+export const getDwYearSummary  = (params) => request.get('/dw/record/year-summary', { params })
