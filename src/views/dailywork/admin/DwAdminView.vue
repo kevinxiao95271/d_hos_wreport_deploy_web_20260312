@@ -373,6 +373,8 @@ function flattenItem(moduleKey, item) {
     'compStartHalf', 'compEndDate', 'compEndHalf',
     'coverageRate',
     'startYearQuarter', 'quarterIndex',
+    // 前端内部 flag，不展示
+    '_readOnly', '_fromQuarter',
   ])
   const r = {}
 
