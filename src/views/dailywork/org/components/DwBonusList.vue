@@ -247,10 +247,12 @@ function formatCompDate(item) {
 }
 
 function initBlankForm() {
-  form.value = {
-    recordId: props.recordId, bonusType: props.bonusType, extraValues: {},
-    compStartHalf: 'AM', compEndHalf: 'PM',
+  const base = { recordId: props.recordId, bonusType: props.bonusType, extraValues: {} }
+  if (props.bonusType === 'competition') {
+    base.compStartHalf = 'AM'
+    base.compEndHalf   = 'PM'
   }
+  form.value = base
   editingItem.value = null
 }
 
@@ -272,12 +274,12 @@ onMounted(() => {
 function openDialog(item) {
   editingItem.value = item
   if (item) {
-    form.value = {
-      ...item,
-      extraValues:   { ...(item.extraValues || {}) },
-      compStartHalf: item.compStartHalf || 'AM',
-      compEndHalf:   item.compEndHalf   || 'PM',
+    const f = { ...item, extraValues: { ...(item.extraValues || {}) } }
+    if (props.bonusType === 'competition') {
+      f.compStartHalf = item.compStartHalf || 'AM'
+      f.compEndHalf   = item.compEndHalf   || 'PM'
     }
+    form.value = f
   } else {
     initBlankForm()
   }
@@ -308,8 +310,15 @@ async function handleSave() {
   try {
     const payload = { ...form.value }
     delete payload.extraValues
-    // 旧字段已下线，确保不传
-    delete payload.compDate
+    delete payload.compDate  // 旧字段已下线
+    // publication 不发竞赛字段；competition 不发出版字段，避免后端报"时间区间不完整"
+    if (props.bonusType === 'publication') {
+      delete payload.compName; delete payload.compSponsor
+      delete payload.compStartDate; delete payload.compStartHalf
+      delete payload.compEndDate;   delete payload.compEndHalf
+    } else {
+      delete payload.pubName; delete payload.pubCategory; delete payload.pubDate
+    }
     const res = await saveBonus(payload)
     const savedId = res.data?.id
 
