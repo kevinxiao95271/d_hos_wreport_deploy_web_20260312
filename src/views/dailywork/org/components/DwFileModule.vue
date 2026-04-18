@@ -81,11 +81,16 @@ const FMT = {
 
 // 模块 key → record 字段 / slot 映射
 const SLOT_MAP = {
-  annual_work:     { type: 'single', slot: 'evidence', field: 'annualWorkFiles',     extraKey: 'annualWorkExtra',    ...FMT.pdfDocx },
-  it_construction: { type: 'single', slot: 'evidence', field: 'itConstructionFiles', extraKey: 'itConstructionExtra',...FMT.pdfDocx },
-  admin_response:  { type: 'single', slot: 'evidence', field: 'adminResponseFiles',  extraKey: 'adminResponseExtra', ...FMT.pdfDocx },
+  annual_work:        { type: 'single', slot: 'evidence', field: 'annualWorkFiles',        extraKey: 'annualWorkExtra',        ...FMT.pdfDocx },
+  it_construction:    { type: 'single', slot: 'evidence', field: 'itConstructionFiles',    extraKey: 'itConstructionExtra',    ...FMT.pdfDocx },
+  admin_response:     { type: 'single', slot: 'evidence', field: 'adminResponseFiles',     extraKey: 'adminResponseExtra',     ...FMT.pdfDocx },
+  indicator_db:       { type: 'single', slot: 'evidence', field: 'indicatorDbFiles',       extraKey: 'indicatorDbExtra',       ...FMT.pdfDocx },
+  indicator_monitor:  { type: 'single', slot: 'evidence', field: 'indicatorMonitorFiles',  extraKey: 'indicatorMonitorExtra',  ...FMT.pdfDocx },
+  national_report:    { type: 'single', slot: 'evidence', field: 'nationalReportFiles',    extraKey: 'nationalReportExtra',    ...FMT.pdfDocx },
+  prov_report:        { type: 'single', slot: 'evidence', field: 'provReportFiles',        extraKey: 'provReportExtra',        ...FMT.pdfDocx },
   work_plan: {
     type: 'multi',
+    recordKey: 'workPlanFiles',
     slots: [
       { slot: 'plan',    field: 'plan',    label: '年度工作计划（须加盖公章）', ...FMT.pdfDocx },
       { slot: 'summary', field: 'summary', label: '年度工作总结（须加盖公章）', ...FMT.pdfDocx },
@@ -94,11 +99,21 @@ const SLOT_MAP = {
   },
   activity_report: {
     type: 'multi',
+    recordKey: 'activityReportFiles',
     slots: [
       { slot: 'pre_report',  field: 'pre_report',  label: '活动报备事前截图', ...FMT.imgPdf },
       { slot: 'post_report', field: 'post_report', label: '活动报备事后截图', ...FMT.imgPdf },
     ],
     extraKey: 'activityReportExtra',
+  },
+  bonus_admin: {
+    type: 'multi',
+    recordKey: 'bonusAdminFiles',
+    slots: [
+      { slot: 'national_task', field: 'national_task', label: '国家工作任务证明材料', ...FMT.pdfDocx },
+      { slot: 'prov_task',     field: 'prov_task',     label: '浙江省工作任务证明材料', ...FMT.pdfDocx },
+    ],
+    extraKey: 'bonusAdminExtra',
   },
 }
 
@@ -109,9 +124,8 @@ const multiSlots = computed(() => slotConfig.value.type === 'multi'  ? slotConfi
 function getFiles(field) {
   const cfg = slotConfig.value
   if (cfg.type === 'single') return props.record[cfg.field] || []
-  // multi: workPlanFiles.plan / workPlanFiles.summary etc.
-  const key = props.moduleKey === 'work_plan' ? 'workPlanFiles' : 'activityReportFiles'
-  return props.record[key]?.[field] || []
+  // multi: use recordKey to locate the nested object in the record (e.g. workPlanFiles.plan)
+  return props.record[cfg.recordKey]?.[field] || []
 }
 
 watch(() => {

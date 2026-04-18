@@ -16,28 +16,53 @@
       <el-descriptions-item label="驳回原因" :span="3">{{ detail.auditRemark || '—' }}</el-descriptions-item>
     </el-descriptions>
 
-    <!-- 各模块只读展示 -->
+    <!-- 各模块：大类横幅 + 叶子模块卡片 -->
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
-      <el-card shadow="never" class="module-card">
+
+      <!-- ══ 一级大类横幅 ══ -->
+      <template v-if="mod.isLeaf === false">
+        <div
+          :class="['cat-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
+          @click="toggleModule(mod.moduleKey)"
+        >
+          <div class="cat-banner-left">
+            <el-icon :class="['toggle-icon', 'toggle-icon--cat', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
+            <span class="cat-banner-name">{{ mod.moduleName }}</span>
+          </div>
+          <div class="cat-banner-right">
+            <span v-if="mod.scoreMax != null" class="cat-score-badge">
+              <span class="cat-score-label">满分</span>
+              <span class="cat-score-val">{{ mod.scoreMax }}</span>
+              <span class="cat-score-unit">分</span>
+            </span>
+          </div>
+        </div>
+      </template>
+
+      <!-- ══ 二级叶子模块卡片 ══ -->
+      <template v-else>
+      <div v-show="!mod.parentModuleKey || !isCollapsed(mod.parentModuleKey)" class="leaf-card-wrap">
+      <el-card
+        shadow="never"
+        :class="['module-card', 'module-card--leaf', `module-card--${leafAccentKey(mod.moduleKey)}`]"
+      >
         <template #header>
           <div class="module-header-admin" @click="toggleModule(mod.moduleKey)" style="cursor:pointer">
             <div class="module-header-left">
               <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
               <span class="module-name-admin">{{ mod.moduleName }}</span>
-              <!-- 折叠：满分 · 自评分 · 实际得分（横排，无分式样式） -->
+              <!-- 折叠：满分 · 自评分 · 实际得分 -->
               <div v-if="mod.scoreMax != null && isCollapsed(mod.moduleKey)" class="score-strip score-strip--header">
                 <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
                 <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
-                <span class="score-field"><span class="score-field-label">实际得分</span><span class="score-field-val score-field-val--act">{{ moduleScores[mod.moduleKey]?.actualScore ?? '—' }}</span></span>
+                <span class="score-field" v-if="!isListModule(mod.moduleKey)"><span class="score-field-label">实际得分</span><span class="score-field-val score-field-val--act">{{ moduleScores[mod.moduleKey]?.score ?? '—' }}</span></span>
               </div>
             </div>
             <div class="module-meta">
-              <!-- 考核说明 -->
               <div v-if="mod.scoreDesc" class="meta-box meta-box--desc">
                 <span class="meta-box-label">考核说明</span>
                 <span class="meta-box-text">{{ mod.scoreDesc }}</span>
               </div>
-              <!-- 评分规则 -->
               <div v-if="mod.scoreRule" class="meta-box meta-box--rule">
                 <span class="meta-box-label">评分规则</span>
                 <span class="meta-box-text">{{ mod.scoreRule }}</span>
@@ -48,15 +73,16 @@
 
         <div v-show="!isCollapsed(mod.moduleKey)">
 
-        <!-- 评分行（有 scoreMax 时显示） -->
-        <div v-if="mod.scoreMax != null" class="score-input-bar">
+        <!-- 评分行：列表型模块在子记录中打分，此处仅显示满分+自评分汇总 -->
+        <!-- 非列表型模块（纯上传 / network_build / funding / bonus_admin）在此处打分 -->
+        <div v-if="mod.scoreMax != null && !isListModule(mod.moduleKey)" class="score-input-bar">
           <div class="score-strip score-strip--bar">
             <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
             <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
             <span class="score-field score-field--input">
               <span class="score-field-label">实际得分</span>
               <el-input-number
-                v-model="moduleScores[mod.moduleKey].actualScore"
+                v-model="moduleScores[mod.moduleKey].score"
                 :min="0"
                 :max="mod.scoreMax"
                 :precision="1"
@@ -67,20 +93,20 @@
               />
             </span>
           </div>
-          <span class="score-bar-sep score-bar-sep--after"></span>
-          <span class="score-bar-label">备注</span>
-          <el-input
-            v-model="moduleScores[mod.moduleKey].remark"
-            placeholder="说明不足之处（选填）"
-            size="small"
-            style="flex:1; min-width:160px; max-width:360px"
-          />
           <el-button
             type="primary"
             size="small"
             :loading="savingKey === mod.moduleKey"
             @click="saveModuleScore(mod)"
           >保存评分</el-button>
+        </div>
+        <!-- 列表型模块：自评分汇总只读展示（各条子记录内单独评分） -->
+        <div v-else-if="mod.scoreMax != null && isListModule(mod.moduleKey)" class="score-input-bar score-input-bar--readonly">
+          <div class="score-strip score-strip--bar">
+            <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
+            <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
+          </div>
+          <span class="score-bar-label" style="color:#909399;font-size:12px">请展开各条记录分别评分</span>
         </div>
 
         <!-- 多条记录型 -->
@@ -147,10 +173,68 @@
               <!-- 附件 -->
               <el-divider content-position="left" style="margin:10px 0 6px">附件</el-divider>
               <DwReadonlyAttachments :item="item" :module-key="mod.moduleKey" @preview="(u,n) => previewRef.show(u,n)" />
+              <!-- 子记录评分（仅非季度参考条目） -->
+              <template v-if="!item._readOnly">
+                <el-divider content-position="left" style="margin:10px 0 6px">评分</el-divider>
+                <div class="sub-score-bar">
+                  <span class="score-field-label" style="font-size:12px;color:#606266">本条得分</span>
+                  <el-input-number
+                    v-model="subRecordScores[String(item.id)]"
+                    :min="0"
+                    :precision="1"
+                    :step="0.5"
+                    size="small"
+                    style="width:110px"
+                    controls-position="right"
+                    placeholder="分值"
+                  />
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="savingSubId === String(item.id)"
+                    @click="saveSubRecordScore(mod.moduleKey, item)"
+                  >保存</el-button>
+                </div>
+              </template>
             </el-collapse-item>
           </el-collapse>
           </div>
           <el-empty v-else description="暂无记录" :image-size="50" />
+        </template>
+
+        <!-- 三级质控网络完善（只读展示） -->
+        <template v-else-if="mod.moduleKey === 'network_build'">
+          <template v-if="detail.networkBuild">
+            <el-descriptions border :column="2" size="small">
+              <el-descriptions-item label="市级质控中心数">
+                {{ detail.networkBuild.cityCenterCount ?? 0 }} 家
+              </el-descriptions-item>
+              <el-descriptions-item label="区县级质控中心数">
+                {{ detail.networkBuild.countyCenterCount ?? 0 }} 家
+              </el-descriptions-item>
+              <el-descriptions-item label="已覆盖市级" :span="2">
+                <span v-if="detail.networkBuild.cityCenterNames?.length">
+                  {{ detail.networkBuild.cityCenterNames.join('、') }}
+                </span>
+                <span v-else style="color:#c0c4cc">—</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="已覆盖区县" :span="2">
+                <template v-if="detail.networkBuild.countyCenterGroups?.length">
+                  <div v-for="g in detail.networkBuild.countyCenterGroups" :key="g.cityName" class="county-group-row">
+                    <span class="county-city-label">{{ g.cityName }}：</span>
+                    <span class="county-names">{{ g.counties.join('、') }}</span>
+                  </div>
+                </template>
+                <span v-else-if="detail.networkBuild.countyCenterNames?.length">
+                  {{ detail.networkBuild.countyCenterNames.join('、') }}
+                </span>
+                <span v-else style="color:#c0c4cc">—</span>
+              </el-descriptions-item>
+            </el-descriptions>
+            <el-divider content-position="left" style="margin:12px 0 6px">证明材料</el-divider>
+            <DwReadonlyFileModule module-key="network_build" :record="detail" @preview="(u,n) => previewRef.show(u,n)" />
+          </template>
+          <el-empty v-else description="机构未填写网络完善信息" :image-size="50" />
         </template>
 
         <!-- 加分项：支持 bonus / bonus_pub / bonus_comp 三种 key -->
@@ -187,7 +271,41 @@
 
         </div><!-- /v-show collapse body -->
       </el-card>
-    </template>
+      </div><!-- /leaf-card-wrap -->
+      </template><!-- /isLeaf -->
+
+    </template><!-- /enabledModules loop -->
+
+    <!-- 总分汇总 -->
+    <div class="score-summary-bar" style="margin-top:20px">
+      <div class="score-summary-title">评分汇总</div>
+      <div class="score-summary-cells">
+        <div class="score-summary-cell score-summary-cell--max">
+          <div class="score-summary-label">满分上限</div>
+          <div class="score-summary-val">
+            <span class="score-summary-num">{{ totalMaxScore }}</span>
+            <span class="score-summary-unit">分</span>
+          </div>
+        </div>
+        <div class="score-summary-sep"></div>
+        <div class="score-summary-cell score-summary-cell--self">
+          <div class="score-summary-label">机构自评分</div>
+          <div class="score-summary-val">
+            <span class="score-summary-num">{{ totalSelfScore ?? '—' }}</span>
+            <span v-if="totalSelfScore != null" class="score-summary-unit">分</span>
+          </div>
+        </div>
+        <div class="score-summary-sep"></div>
+        <div class="score-summary-cell score-summary-cell--actual">
+          <div class="score-summary-label">管理员总得分</div>
+          <div class="score-summary-val">
+            <span class="score-summary-num">{{ totalActualScore ?? '—' }}</span>
+            <span v-if="totalActualScore != null" class="score-summary-unit">分</span>
+          </div>
+          <div v-if="totalActualScore == null" class="score-summary-hint">请逐模块完成评分</div>
+        </div>
+      </div>
+    </div>
 
     <!-- 审核操作（status=1 待审核时显示） -->
     <el-card v-if="detail.status === 1" shadow="never" style="margin-top:12px">
@@ -241,7 +359,8 @@ const enabledModules = computed(() => {
   const keys = detail.value.enabledModuleKeys
   if (Array.isArray(keys) && keys.length) {
     const set = new Set(keys)
-    return all.filter(m => set.has(m.moduleKey))
+    // 大类节点（isLeaf=false）始终保留，叶子节点按 enabledModuleKeys 过滤
+    return all.filter(m => !m.isLeaf || set.has(m.moduleKey))
   }
   return all
 })
@@ -267,33 +386,39 @@ function moduleSelfScoreText(mod) {
   return v
 }
 
-// 每模块评分状态
-const moduleScores = ref({})   // { [moduleKey]: { actualScore, remark } }
+// 模块级评分状态（非列表型：纯上传 / network_build / funding / bonus_admin）
+const moduleScores = ref({})   // { [moduleKey]: { score } }
 const savingKey    = ref(null)
+
+// 子记录评分状态（列表型：meeting / training / guidance / survey 等）
+const subRecordScores = ref({})  // { [subRecordId]: score }
+const savingSubId     = ref(null)
 
 function initModuleScores(mods) {
   const s = {}
   mods.forEach(m => {
-    if (m.scoreMax != null) {
-      s[m.moduleKey] = {
-        actualScore: m.actualScore ?? null,
-        remark:      m.scoreRemark ?? '',
-      }
+    if (m.scoreMax != null && !LIST_MODULES.includes(m.moduleKey)) {
+      s[m.moduleKey] = { score: null }
     }
   })
   moduleScores.value = s
 }
 
+/** 非列表型模块：模块级评分（subRecordId = null） */
 async function saveModuleScore(mod) {
   const entry = moduleScores.value[mod.moduleKey]
   if (!entry) return
+  if (entry.score === null || entry.score === undefined) {
+    ElMessage.warning('请输入分值')
+    return
+  }
   savingKey.value = mod.moduleKey
   try {
     await saveDwModuleScore({
       recordId:    recordId,
       moduleKey:   mod.moduleKey,
-      actualScore: entry.actualScore,
-      scoreRemark: entry.remark,
+      subRecordId: null,
+      score:       entry.score,
     })
     ElMessage.success(`${mod.moduleName} 评分已保存`)
   } catch (e) {
@@ -302,6 +427,85 @@ async function saveModuleScore(mod) {
     savingKey.value = null
   }
 }
+
+/** 列表型模块：子记录级评分（subRecordId 必填） */
+async function saveSubRecordScore(moduleKey, item) {
+  const score = subRecordScores.value[String(item.id)]
+  if (score === null || score === undefined) {
+    ElMessage.warning('请输入分值')
+    return
+  }
+  savingSubId.value = String(item.id)
+  try {
+    await saveDwModuleScore({
+      recordId:    recordId,
+      moduleKey:   moduleKey,
+      subRecordId: String(item.id),
+      score:       score,
+    })
+    ElMessage.success('评分已保存')
+  } catch (e) {
+    ElMessage.error(e.message || '保存失败')
+  } finally {
+    savingSubId.value = null
+  }
+}
+
+// ── 总分汇总 ──────────────────────────────
+/** 所有叶子模块满分合计 */
+const totalMaxScore = computed(() =>
+  enabledModules.value
+    .filter(m => m.isLeaf !== false && m.scoreMax != null)
+    .reduce((acc, m) => acc + Number(m.scoreMax), 0)
+)
+
+/** 机构总自评分（detail.moduleSelfScores 按叶子模块 key 求和） */
+const totalSelfScore = computed(() => {
+  const selfMap = detail.value.moduleSelfScores || {}
+  const leafKeys = new Set(
+    enabledModules.value.filter(m => m.isLeaf !== false).map(m => m.moduleKey)
+  )
+  const vals = Object.entries(selfMap)
+    .filter(([k]) => leafKeys.has(k))
+    .map(([, v]) => Number(v))
+    .filter(v => !isNaN(v))
+  return vals.length ? vals.reduce((a, b) => a + b, 0) : null
+})
+
+/** 管理员总得分（非列表型 moduleScores + 列表型 subRecordScores 之和） */
+const totalActualScore = computed(() => {
+  let total = 0
+  let hasAny = false
+  Object.values(moduleScores.value).forEach(entry => {
+    if (entry?.score != null) { total += Number(entry.score); hasAny = true }
+  })
+  Object.values(subRecordScores.value).forEach(score => {
+    if (score != null) { total += Number(score); hasAny = true }
+  })
+  return hasAny ? Math.round(total * 10) / 10 : null
+})
+
+// 大类横幅颜色
+const CAT_COLOR_MAP = {
+  cat_plan:       'blue',
+  cat_network:    'teal',
+  cat_training:   'purple',
+  cat_report:     'orange',
+  cat_compliance: 'green',
+  cat_bonus:      'gold',
+}
+function catColorKey(key) { return CAT_COLOR_MAP[key] || 'blue' }
+
+// 叶子左侧竖条颜色（跟随所属大类）
+const LEAF_ACCENT_MAP = {
+  work_plan: 'blue', annual_work: 'blue', indicator_db: 'blue',
+  network_build: 'teal', meeting: 'teal',
+  training: 'purple', survey: 'purple', guidance: 'purple',
+  indicator_monitor: 'orange', national_report: 'orange', prov_report: 'orange',
+  activity_report: 'green', funding: 'green',
+  bonus_pub: 'gold', bonus_comp: 'gold', bonus_admin: 'gold',
+}
+function leafAccentKey(key) { return LEAF_ACCENT_MAP[key] || 'blue' }
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' }
@@ -415,6 +619,18 @@ function flattenItem(moduleKey, item) {
   return r
 }
 
+function initSubRecordScores(detailData) {
+  const s = {}
+  const keys = ['meetings', 'trainings', 'guidances', 'surveys', 'bonuses']
+  keys.forEach(k => {
+    ;(detailData[k] || []).forEach(item => {
+      const existing = item.extraValues?.module_self_score
+      s[String(item.id)] = existing != null ? Number(existing) : null
+    })
+  })
+  subRecordScores.value = s
+}
+
 async function loadAll() {
   loading.value = true
   try {
@@ -422,6 +638,7 @@ async function loadAll() {
     modules.value = modRes.data    || []
     detail.value  = detailRes.data || {}
     initModuleScores(modules.value)
+    initSubRecordScores(detail.value)
     // 年度任务：加载已通过季度数据，供各模块混入展示（灰态只读）
     if (isAnnualTask.value && detail.value.statYear) {
       const orgId = detail.value.orgId ? String(detail.value.orgId) : null
@@ -451,11 +668,154 @@ onMounted(loadAll)
 
 <style scoped>
 .dw-admin-view { max-width: 960px; margin: 0 auto; }
+/* ══════════════════════════════════════
+   一级大类横幅（浅色专业风格）
+══════════════════════════════════════ */
+.cat-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  margin-top: 28px;
+  cursor: pointer;
+  user-select: none;
+  border-left: 5px solid;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s;
+}
+.cat-banner:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.10); }
+
+.cat-banner--blue   { background: #f0f7ff; border-left-color: #2d8fdc; }
+.cat-banner--teal   { background: #edf9f8; border-left-color: #1aa89d; }
+.cat-banner--purple { background: #f5f0ff; border-left-color: #9254de; }
+.cat-banner--orange { background: #fff6ed; border-left-color: #e07a1a; }
+.cat-banner--green  { background: #edf7ef; border-left-color: #3daa5c; }
+.cat-banner--gold   { background: #fdf8e8; border-left-color: #c89a0e; }
+
+.cat-banner-left  { display: flex; align-items: center; gap: 10px; }
+.cat-banner-right { display: flex; align-items: center; gap: 10px; }
+
+.cat-banner-name  { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+.cat-banner--blue   .cat-banner-name { color: #1565a8; }
+.cat-banner--teal   .cat-banner-name { color: #0b6b65; }
+.cat-banner--purple .cat-banner-name { color: #5b2d9e; }
+.cat-banner--orange .cat-banner-name { color: #8c4800; }
+.cat-banner--green  .cat-banner-name { color: #1d6b35; }
+.cat-banner--gold   .cat-banner-name { color: #7a5600; }
+
+.toggle-icon--cat { font-size: 16px; transition: transform 0.25s; }
+.cat-banner--blue   .toggle-icon--cat { color: #2d8fdc; }
+.cat-banner--teal   .toggle-icon--cat { color: #1aa89d; }
+.cat-banner--purple .toggle-icon--cat { color: #9254de; }
+.cat-banner--orange .toggle-icon--cat { color: #e07a1a; }
+.cat-banner--green  .toggle-icon--cat { color: #3daa5c; }
+.cat-banner--gold   .toggle-icon--cat { color: #c89a0e; }
+
+.cat-score-badge { display: inline-flex; align-items: baseline; gap: 3px; border-radius: 20px; padding: 3px 12px; border: 1px solid; }
+.cat-banner--blue   .cat-score-badge { background: #daeeff; border-color: #aed4f5; }
+.cat-banner--teal   .cat-score-badge { background: #d5f3f1; border-color: #9de0da; }
+.cat-banner--purple .cat-score-badge { background: #ecdeff; border-color: #c9a7f0; }
+.cat-banner--orange .cat-score-badge { background: #fde8d0; border-color: #f5bf8a; }
+.cat-banner--green  .cat-score-badge { background: #d4f0dc; border-color: #99d8af; }
+.cat-banner--gold   .cat-score-badge { background: #faedc5; border-color: #e0c46a; }
+
+.cat-score-label  { font-size: 11px; color: #666; }
+.cat-score-val    { font-size: 18px; font-weight: 800; line-height: 1; }
+.cat-banner--blue   .cat-score-val { color: #1565a8; }
+.cat-banner--teal   .cat-score-val { color: #0b6b65; }
+.cat-banner--purple .cat-score-val { color: #5b2d9e; }
+.cat-banner--orange .cat-score-val { color: #8c4800; }
+.cat-banner--green  .cat-score-val { color: #1d6b35; }
+.cat-banner--gold   .cat-score-val { color: #7a5600; }
+.cat-score-unit   { font-size: 11px; color: #666; }
+
+/* ══════════════════════════════════════
+   总分汇总条
+══════════════════════════════════════ */
+.score-summary-bar {
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  padding: 16px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.score-summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 14px;
+  letter-spacing: 0.5px;
+}
+.score-summary-cells {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.score-summary-cell {
+  flex: 1;
+  text-align: center;
+  padding: 4px 0;
+}
+.score-summary-sep {
+  width: 1px;
+  height: 52px;
+  background: #ebeef5;
+  flex-shrink: 0;
+}
+.score-summary-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+.score-summary-val {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+}
+.score-summary-num {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.score-summary-unit {
+  font-size: 13px;
+  font-weight: 500;
+}
+.score-summary-hint {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.score-summary-cell--max .score-summary-num  { color: #909399; }
+.score-summary-cell--max .score-summary-unit { color: #909399; }
+.score-summary-cell--self .score-summary-num  { color: #409eff; }
+.score-summary-cell--self .score-summary-unit { color: #409eff; }
+.score-summary-cell--actual .score-summary-num  { color: #e6a23c; }
+.score-summary-cell--actual .score-summary-unit { color: #e6a23c; }
+.score-summary-cell--actual .score-summary-hint { color: #c0c4cc; }
+
+/* ══════════════════════════════════════
+   二级叶子模块卡片
+══════════════════════════════════════ */
+.leaf-card-wrap { margin-bottom: 12px; margin-left: 12px; }
+.module-card--leaf {
+  border-left-width: 4px !important;
+  border-left-style: solid !important;
+}
+.module-card--blue   { border-left-color: #2d8fdc !important; }
+.module-card--teal   { border-left-color: #1aa89d !important; }
+.module-card--purple { border-left-color: #9254de !important; }
+.module-card--orange { border-left-color: #e07a1a !important; }
+.module-card--green  { border-left-color: #4caf6a !important; }
+.module-card--gold   { border-left-color: #d4a017 !important; }
+
 .module-card   { margin-bottom: 12px; }
 .bonus-type-label { font-size: 13px; font-weight: 600; color: #606266; margin: 0 0 10px; }
 .module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; user-select: none; }
 .module-header-left  { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-top: 4px; }
-.module-name-admin   { font-size: 15px; font-weight: 600; color: #303133; }
+.module-name-admin   { font-size: 14px; font-weight: 600; color: #303133; }
 .module-meta         { display: flex; flex-direction: column; gap: 6px; min-width: 320px; max-width: 460px; }
 .toggle-icon {
   font-size: 14px;
@@ -547,9 +907,19 @@ onMounted(loadAll)
   border-radius: 6px;
   font-size: 13px;
 }
+.score-input-bar--readonly {
+  background: #f9fafb;
+  border-color: #ebeef5;
+}
 .score-bar-sep  { width: 1px; height: 18px; background: #dcdfe6; flex-shrink: 0; }
 .score-bar-sep--after { margin: 0 2px; }
 .score-bar-label { color: #606266; white-space: nowrap; }
+.sub-score-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
 
 /* 记录列表局部滚动容器 */
 .collapse-scroll-wrap {

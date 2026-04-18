@@ -34,19 +34,27 @@ import { Document } from '@element-plus/icons-vue'
 const props = defineProps({ moduleKey: String, record: Object })
 defineEmits(['preview'])
 const SLOT_MAP = {
-  annual_work:     { type: 'single', field: 'annualWorkFiles' },
-  it_construction: { type: 'single', field: 'itConstructionFiles' },
-  admin_response:  { type: 'single', field: 'adminResponseFiles' },
-  work_plan: { type: 'multi', slots: [{ slot: 'plan', field: 'plan', label: '年度计划' }, { slot: 'summary', field: 'summary', label: '年度总结' }] },
-  activity_report: { type: 'multi', slots: [{ slot: 'pre_report', field: 'pre_report', label: '事前截图' }, { slot: 'post_report', field: 'post_report', label: '事后截图' }] },
+  annual_work:       { type: 'single', field: 'annualWorkFiles' },
+  it_construction:   { type: 'single', field: 'itConstructionFiles' },
+  admin_response:    { type: 'single', field: 'adminResponseFiles' },
+  indicator_db:      { type: 'single', field: 'indicatorDbFiles' },
+  indicator_monitor: { type: 'single', field: 'indicatorMonitorFiles' },
+  national_report:   { type: 'single', field: 'nationalReportFiles' },
+  prov_report:       { type: 'single', field: 'provReportFiles' },
+  network_build:     { type: 'nested', recordKey: 'networkBuild', nestedField: 'evidences' },
+  work_plan:         { type: 'multi', recordKey: 'workPlanFiles',       slots: [{ slot: 'plan', field: 'plan', label: '年度计划' }, { slot: 'summary', field: 'summary', label: '年度总结' }] },
+  activity_report:   { type: 'multi', recordKey: 'activityReportFiles', slots: [{ slot: 'pre_report', field: 'pre_report', label: '事前截图' }, { slot: 'post_report', field: 'post_report', label: '事后截图' }] },
+  bonus_admin:       { type: 'multi', recordKey: 'bonusAdminFiles',     slots: [{ slot: 'national_task', field: 'national_task', label: '国家工作任务' }, { slot: 'prov_task', field: 'prov_task', label: '浙江省工作任务' }] },
 }
-const cfg       = computed(() => SLOT_MAP[props.moduleKey] || { type: 'single', field: 'annualWorkFiles' })
+const cfg        = computed(() => SLOT_MAP[props.moduleKey] || { type: 'single', field: 'annualWorkFiles' })
 const singleSlot = computed(() => cfg.value.type === 'single' ? cfg.value : null)
 const multiSlots = computed(() => cfg.value.type === 'multi'  ? cfg.value.slots : [])
 function getFiles(field) {
-  if (cfg.value.type === 'single') return props.record[cfg.value.field] || []
-  const key = props.moduleKey === 'work_plan' ? 'workPlanFiles' : 'activityReportFiles'
-  return props.record[key]?.[field] || []
+  const c = cfg.value
+  if (c.type === 'single') return props.record[c.field] || []
+  if (c.type === 'nested') return props.record[c.recordKey]?.[c.nestedField] || []
+  // multi: use recordKey
+  return props.record[c.recordKey]?.[field] || []
 }
 const IMAGE_EXTS=['jpg','jpeg','png','gif','webp'], PDF_EXTS=['pdf'], DOCX_EXTS=['docx','doc']
 function ext(n){return(n||'').split('.').pop().toLowerCase()}

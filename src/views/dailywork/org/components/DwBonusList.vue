@@ -72,7 +72,7 @@
           </el-form-item>
           <el-form-item v-if="bonusType === 'competition'" label="主办类型" prop="compSponsor" :rules="req">
             <el-select v-model="form.compSponsor" style="width:100%">
-              <el-option label="省级联合主办" value="provincial_joint" />
+              <el-option label="省总工会省卫健委联合主办" value="provincial_joint" />
               <el-option label="其他" value="other" />
             </el-select>
           </el-form-item>
@@ -140,7 +140,7 @@
     <el-empty v-else description="暂无加分项" :image-size="60" />
 
     <!-- 编辑/新增弹窗（有列表时使用） -->
-    <el-dialog v-model="dialogVisible" :title="editingItem ? '编辑加分项' : '新增加分项'" width="500px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" destroy-on-close>
       <el-form :model="form" label-width="110px" ref="formRef">
         <el-form-item v-if="bonusType === 'publication'" label="出版物名称" prop="pubName" :rules="req">
           <el-input v-model="form.pubName" placeholder="书名/指南名/共识名/标准名" />
@@ -159,7 +159,7 @@
         </el-form-item>
         <el-form-item v-if="bonusType === 'competition'" label="主办类型" prop="compSponsor" :rules="req">
           <el-select v-model="form.compSponsor" style="width:100%">
-            <el-option label="省级联合主办" value="provincial_joint" />
+            <el-option label="省总工会省卫健委联合主办" value="provincial_joint" />
             <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
@@ -199,7 +199,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { saveBonus, deleteBonus, saveDwFieldValues, uploadDwAttachment } from '@/api/dailywork'
@@ -229,8 +229,15 @@ const pendingOpenId   = ref(null)
 const pendingEvidence = ref([])    // 内联表单待上传的证明文件
 const uploadingInline = ref(false)
 
+const bonusSubName = computed(() =>
+  props.bonusType === 'publication' ? '公开发表类' : props.bonusType === 'competition' ? '技能竞赛类' : ''
+)
+const dialogTitle = computed(() =>
+  editingItem.value ? `编辑加分项 · ${bonusSubName.value}` : `新增加分项 · ${bonusSubName.value}`
+)
+
 const pubCategoryLabel = v => ({ book_guide_consensus: '专著/指南/共识', standard_norm: '标准/规范' }[v] ?? v)
-const compSponsorLabel = v => ({ provincial_joint: '省级联合主办', other: '其他' }[v] ?? v)
+const compSponsorLabel = v => ({ provincial_joint: '省总工会省卫健委联合主办', other: '其他' }[v] ?? v)
 
 const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
 function pickerDateStr(d) {

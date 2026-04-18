@@ -31,7 +31,8 @@ export const saveSurvey     = (data) => request.post('/dw/record/survey/save', d
 export const deleteSurvey   = (id)   => request.post(`/dw/record/survey/delete/${id}`)
 export const saveBonus      = (data) => request.post('/dw/record/bonus/save', data)
 export const deleteBonus    = (id)   => request.post(`/dw/record/bonus/delete/${id}`)
-export const saveFunding    = (data) => request.post('/dw/record/funding/save', data)
+export const saveFunding        = (data) => request.post('/dw/record/funding/save', data)
+export const saveNetworkBuild   = (data) => request.post('/dw/record/network-build/save', data)
 
 // ── 附件 ──────────────────────────────────────────────────────
 export function uploadDwAttachment(recordId, moduleType, slot, file, subRecordId = null) {
@@ -52,8 +53,10 @@ export const deleteDwAttachment = (id) => request.post(`/dw/record/attachment/de
 export const getGuidanceRegions = () => request.get('/dw/config/guidance/regions')
 
 // 模块评分（管理员）
+// data: { recordId, moduleKey, subRecordId, score }
+// 多条记录型（meeting/training/guidance/survey/bonus_pub/bonus_comp）subRecordId 为子记录 ID
+// 纯上传型 / network_build / funding / bonus_admin 的 subRecordId 传 null
 export const saveDwModuleScore = (data) => request.post('/dw/record/module/score/save', data)
-// data: { recordId, moduleKey, actualScore, scoreRemark }
 
 /** 年度汇总（管理端传 orgId；机构端不传自动取当前机构） */
 export const getDwYearSummary  = (params) => request.get('/dw/record/year-summary', { params })

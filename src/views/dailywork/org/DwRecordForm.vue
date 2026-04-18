@@ -18,9 +18,38 @@
       :title="`驳回原因：${detail.auditRemark}`"
     />
 
-    <!-- 各模块卡片 -->
+    <!-- 各模块渲染：大类（isLeaf=false）用横幅标题，填报模块（isLeaf=true）用卡片 -->
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
-      <el-card shadow="never" class="module-card">
+
+      <!-- ══ 一级大类横幅 ══ -->
+      <template v-if="mod.isLeaf === false">
+        <div
+          :class="['cat-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
+          @click="toggleModule(mod.moduleKey)"
+        >
+          <div class="cat-banner-left">
+            <el-icon :class="['toggle-icon', 'toggle-icon--cat', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
+            <span class="cat-banner-name">{{ mod.moduleName }}</span>
+          </div>
+          <div class="cat-banner-right">
+            <span v-if="mod.scoreMax" class="cat-score-badge">
+              <span class="cat-score-label">满分</span>
+              <span class="cat-score-val">{{ mod.scoreMax }}</span>
+              <span class="cat-score-unit">分</span>
+            </span>
+            <el-icon class="cat-banner-arrow" :class="{ 'is-collapsed': isCollapsed(mod.moduleKey) }"><ArrowDown /></el-icon>
+          </div>
+        </div>
+        <!-- 大类无内容体，子模块紧随其后 -->
+      </template>
+
+      <!-- ══ 二级填报模块卡片 ══ -->
+      <template v-else>
+      <div v-show="!mod.parentModuleKey || !isCollapsed(mod.parentModuleKey)" class="leaf-card-wrap">
+      <el-card
+        shadow="never"
+        :class="['module-card', 'module-card--leaf', `module-card--${leafAccentKey(mod.moduleKey)}`]"
+      >
         <template #header>
           <div class="module-header" @click="toggleModule(mod.moduleKey)" style="cursor:pointer">
             <div class="module-header-left">
@@ -108,7 +137,20 @@
           </template>
         </template>
 
-        <!-- ③ 经费执行（特殊表单） -->
+        <!-- ③ 三级质控网络完善（树选择+单记录） -->
+        <template v-else-if="isNetworkBuildModule(mod.moduleKey)">
+          <DwNetworkBuildForm
+            :module-config="mod"
+            :network-build="detail.networkBuild"
+            :record="detail"
+            :record-id="detail.recordId"
+            :editable="editable"
+            @saved="reloadDetail"
+            @deleted="reloadDetail"
+          />
+        </template>
+
+        <!-- ④ 经费执行（特殊表单） -->
         <template v-else-if="mod.moduleKey === 'funding'">
           <DwFundingForm
             :module-config="mod"
@@ -120,7 +162,7 @@
           />
         </template>
 
-        <!-- ④ 纯上传模块 -->
+        <!-- ⑤ 纯上传模块（含 bonus_admin 双槽） -->
         <template v-else>
           <DwFileModule
             :module-key="mod.moduleKey"
@@ -134,7 +176,10 @@
         </template>
         </div><!-- /v-show collapse body -->
       </el-card>
-    </template>
+      </div><!-- /leaf-card-wrap -->
+      </template><!-- /isLeaf -->
+
+    </template><!-- /enabledModules loop -->
 
     <!-- 提交栏 -->
     <div v-if="editable" class="submit-bar">
@@ -153,10 +198,11 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, initDwRecord, getDwRecord, submitDwRecord, saveDwFieldValues, getDwYearSummary } from '@/api/dailywork'
-import DwSubList    from './components/DwSubList.vue'
-import DwBonusList  from './components/DwBonusList.vue'
-import DwFundingForm from './components/DwFundingForm.vue'
-import DwFileModule from './components/DwFileModule.vue'
+import DwSubList          from './components/DwSubList.vue'
+import DwBonusList        from './components/DwBonusList.vue'
+import DwFundingForm      from './components/DwFundingForm.vue'
+import DwFileModule       from './components/DwFileModule.vue'
+import DwNetworkBuildForm from './components/DwNetworkBuildForm.vue'
 
 const route      = useRoute()
 const taskId     = route.params.taskId
@@ -179,7 +225,8 @@ const enabledModules = computed(() => {
   const keys = detail.value.enabledModuleKeys
   if (Array.isArray(keys) && keys.length) {
     const set = new Set(keys)
-    return all.filter(m => set.has(m.moduleKey))
+    // 大类节点（isLeaf=false）始终保留，叶子节点按 enabledModuleKeys 过滤
+    return all.filter(m => !m.isLeaf || set.has(m.moduleKey))
   }
   return all
 })
@@ -198,10 +245,34 @@ function toggleModule(key) {
 }
 function isCollapsed(key) { return collapsedKeys.value.has(key) }
 
+// 大类横幅颜色主题（5色循环对应5大类）
+const CAT_COLOR_MAP = {
+  cat_plan:       'blue',
+  cat_network:    'teal',
+  cat_training:   'purple',
+  cat_report:     'orange',
+  cat_compliance: 'green',
+  cat_bonus:      'gold',
+}
+function catColorKey(key) { return CAT_COLOR_MAP[key] || 'blue' }
+
+// 叶子卡片左侧竖条颜色跟随所属大类
+const LEAF_ACCENT_MAP = {
+  work_plan: 'blue', annual_work: 'blue', indicator_db: 'blue',
+  network_build: 'teal', meeting: 'teal',
+  training: 'purple', survey: 'purple', guidance: 'purple',
+  indicator_monitor: 'orange', national_report: 'orange', prov_report: 'orange',
+  activity_report: 'green', funding: 'green',
+  bonus_pub: 'gold', bonus_comp: 'gold', bonus_admin: 'gold',
+}
+function leafAccentKey(key) { return LEAF_ACCENT_MAP[key] || 'blue' }
+
 function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) {
+  // bonus_admin 是纯上传型，不走 DwBonusList，由 DwFileModule 处理
   return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp'
 }
+function isNetworkBuildModule(key) { return key === 'network_build' }
 
 function getListItems(key) {
   const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({
@@ -313,7 +384,116 @@ onMounted(loadAll)
 
 <style scoped>
 .dw-form-page { max-width: 960px; margin: 0 auto; }
-.module-card  { margin-bottom: 16px; }
+
+/* ══════════════════════════════════════
+   一级大类横幅（浅色专业风格）
+══════════════════════════════════════ */
+.cat-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  margin-top: 28px;
+  cursor: pointer;
+  user-select: none;
+  border-left: 5px solid;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s, opacity 0.2s;
+}
+.cat-banner:first-child { margin-top: 0; }
+.cat-banner:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.10); }
+
+/* 浅色背景 + 左边框色 */
+.cat-banner--blue   { background: #f0f7ff; border-left-color: #2d8fdc; }
+.cat-banner--teal   { background: #edf9f8; border-left-color: #1aa89d; }
+.cat-banner--purple { background: #f5f0ff; border-left-color: #9254de; }
+.cat-banner--orange { background: #fff6ed; border-left-color: #e07a1a; }
+.cat-banner--green  { background: #edf7ef; border-left-color: #3daa5c; }
+.cat-banner--gold   { background: #fdf8e8; border-left-color: #c89a0e; }
+
+/* 文字颜色随主题 */
+.cat-banner--blue   .cat-banner-name { color: #1565a8; }
+.cat-banner--teal   .cat-banner-name { color: #0b6b65; }
+.cat-banner--purple .cat-banner-name { color: #5b2d9e; }
+.cat-banner--orange .cat-banner-name { color: #8c4800; }
+.cat-banner--green  .cat-banner-name { color: #1d6b35; }
+.cat-banner--gold   .cat-banner-name { color: #7a5600; }
+
+/* 展开箭头颜色随主题 */
+.cat-banner--blue   .toggle-icon--cat { color: #2d8fdc; }
+.cat-banner--teal   .toggle-icon--cat { color: #1aa89d; }
+.cat-banner--purple .toggle-icon--cat { color: #9254de; }
+.cat-banner--orange .toggle-icon--cat { color: #e07a1a; }
+.cat-banner--green  .toggle-icon--cat { color: #3daa5c; }
+.cat-banner--gold   .toggle-icon--cat { color: #c89a0e; }
+
+.cat-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cat-banner-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.cat-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 满分徽章 */
+.cat-score-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  border-radius: 20px;
+  padding: 3px 12px;
+  border: 1px solid;
+}
+.cat-banner--blue   .cat-score-badge { background: #daeeff; border-color: #aed4f5; }
+.cat-banner--teal   .cat-score-badge { background: #d5f3f1; border-color: #9de0da; }
+.cat-banner--purple .cat-score-badge { background: #ecdeff; border-color: #c9a7f0; }
+.cat-banner--orange .cat-score-badge { background: #fde8d0; border-color: #f5bf8a; }
+.cat-banner--green  .cat-score-badge { background: #d4f0dc; border-color: #99d8af; }
+.cat-banner--gold   .cat-score-badge { background: #faedc5; border-color: #e0c46a; }
+
+.cat-score-label { font-size: 11px; color: #666; }
+.cat-score-val   { font-size: 18px; font-weight: 800; line-height: 1; }
+.cat-score-unit  { font-size: 11px; color: #666; }
+
+.cat-banner--blue   .cat-score-val { color: #1565a8; }
+.cat-banner--teal   .cat-score-val { color: #0b6b65; }
+.cat-banner--purple .cat-score-val { color: #5b2d9e; }
+.cat-banner--orange .cat-score-val { color: #8c4800; }
+.cat-banner--green  .cat-score-val { color: #1d6b35; }
+.cat-banner--gold   .cat-score-val { color: #7a5600; }
+
+.toggle-icon--cat {
+  font-size: 16px;
+  transition: transform 0.25s;
+}
+
+/* ══════════════════════════════════════
+   二级叶子模块卡片
+══════════════════════════════════════ */
+.leaf-card-wrap { margin-bottom: 12px; margin-left: 12px; }
+.module-card { }
+.module-card--leaf {
+  border-left-width: 4px !important;
+  border-left-style: solid !important;
+}
+/* 左侧竖条颜色 */
+.module-card--blue   { border-left-color: #2d8fdc !important; }
+.module-card--teal   { border-left-color: #1aa89d !important; }
+.module-card--purple { border-left-color: #9254de !important; }
+.module-card--orange { border-left-color: #e07a1a !important; }
+.module-card--green  { border-left-color: #4caf6a !important; }
+.module-card--gold   { border-left-color: #d4a017 !important; }
+
 .module-header {
   display: flex;
   align-items: center;
@@ -321,7 +501,7 @@ onMounted(loadAll)
   user-select: none;
 }
 .module-header-left { display: flex; align-items: center; gap: 6px; }
-.module-name { font-size: 15px; font-weight: 600; color: #303133; }
+.module-name { font-size: 14px; font-weight: 600; color: #303133; }
 .toggle-icon {
   font-size: 14px;
   color: #909399;
