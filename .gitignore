@@ -6,3 +6,6 @@ dist/
 .DS_Store
 frontend-template-guide.md
 *.xlsx
+
+check.py
+deploy.py
