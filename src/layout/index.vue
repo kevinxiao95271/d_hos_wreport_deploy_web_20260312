@@ -34,7 +34,7 @@
           </el-menu-item>
           <el-menu-item index="/score/board414">
             <el-icon><DataLine /></el-icon>
-            <span>得分看板</span>
+            <span>历史得分看板</span>
           </el-menu-item>
         </template>
         <template v-else>

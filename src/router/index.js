@@ -17,7 +17,7 @@ const routes = [
       { path: '/admin/crossview',    name: 'CrossView',      component: () => import('@/views/workreport/admin/CrossView.vue'),      meta: { title: '数据汇聚',   role: 'deptAdmin' } },
       { path: '/admin/dw-config',   name: 'DwModuleConfig', component: () => import('@/views/dailywork/admin/DwModuleConfig.vue'),  meta: { title: '日常工作配置', role: 'deptAdmin' } },
       { path: '/admin/dw-view',     name: 'DwAdminView',    component: () => import('@/views/dailywork/admin/DwAdminView.vue'),    meta: { title: '日常工作详情', role: 'deptAdmin', hidden: true } },
-      { path: '/score/board414',    name: 'ScoreBoard414',  component: () => import('@/views/score/ScoreBoard414.vue'),            meta: { title: '得分看板' } },
+      { path: '/score/board414',    name: 'ScoreBoard414',  component: () => import('@/views/score/ScoreBoard414.vue'),            meta: { title: '历史得分看板' } },
       // 机构端
       { path: '/org/task-list',    name: 'OrgTaskList',    component: () => import('@/views/workreport/org/OrgTaskList.vue'),    meta: { title: '上报任务', role: 'org' } },
       { path: '/org/report-form',  name: 'ReportForm',     component: () => import('@/views/workreport/org/ReportForm.vue'),     meta: { title: '填报表单', role: 'org', hidden: true } },
