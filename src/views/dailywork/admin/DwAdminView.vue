@@ -297,7 +297,7 @@
         </div>
         <div class="score-summary-sep"></div>
         <div class="score-summary-cell score-summary-cell--actual">
-          <div class="score-summary-label">管理员总得分</div>
+          <div class="score-summary-label">实际总得分</div>
           <div class="score-summary-val">
             <span class="score-summary-num">{{ totalActualScore ?? '—' }}</span>
             <span v-if="totalActualScore != null" class="score-summary-unit">分</span>
