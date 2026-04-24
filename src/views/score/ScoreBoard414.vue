@@ -69,8 +69,8 @@
                 :key="idx"
                 :class="{ 'row-odd': idx % 2 === 0 }"
               >
-                <td class="col-seq">{{ row[0] }}</td>
-                <td class="col-name">{{ row[1] }}</td>
+                <td class="col-fixed col-seq">{{ row[0] }}</td>
+                <td class="col-fixed col-name">{{ row[1] }}</td>
                 <td v-for="ci in scoreColIndices" :key="ci" :class="scoreClass(row[ci], maxScores[ci])">
                   {{ row[ci] }}
                 </td>
@@ -148,8 +148,8 @@
                 :key="idx"
                 :class="{ 'row-odd': idx % 2 === 0 }"
               >
-                <td class="col-seq">{{ row[0] }}</td>
-                <td class="col-name">{{ row[1] }}</td>
+                <td class="col-fixed col-seq">{{ row[0] }}</td>
+                <td class="col-fixed col-name">{{ row[1] }}</td>
                 <td v-for="ci in scoreColIndices" :key="ci" :class="scoreClass(row[ci], maxScores[ci])">
                   {{ row[ci] }}
                 </td>
@@ -365,8 +365,11 @@ const jsData = [
 /* 固定列 */
 .col-fixed {
   position: sticky;
-  background: #fafafa;
+  background: #fff;
   z-index: 1;
+}
+.row-odd .col-fixed {
+  background: #fafafa;
 }
 
 .col-seq {
