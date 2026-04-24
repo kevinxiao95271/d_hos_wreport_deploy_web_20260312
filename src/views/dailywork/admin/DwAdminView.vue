@@ -73,9 +73,8 @@
 
         <div v-show="!isCollapsed(mod.moduleKey)">
 
-        <!-- 评分行：列表型模块在子记录中打分，此处仅显示满分+自评分汇总 -->
-        <!-- 非列表型模块（纯上传 / network_build / funding / bonus_admin）在此处打分 -->
-        <div v-if="mod.scoreMax != null && !isListModule(mod.moduleKey)" class="score-input-bar">
+        <!-- 评分行：所有有 scoreMax 的模块均在此处统一打分 -->
+        <div v-if="mod.scoreMax != null" class="score-input-bar">
           <div class="score-strip score-strip--bar">
             <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
             <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
@@ -99,14 +98,6 @@
             :loading="savingKey === mod.moduleKey"
             @click="saveModuleScore(mod)"
           >保存评分</el-button>
-        </div>
-        <!-- 列表型模块：自评分汇总只读展示（各条子记录内单独评分） -->
-        <div v-else-if="mod.scoreMax != null && isListModule(mod.moduleKey)" class="score-input-bar score-input-bar--readonly">
-          <div class="score-strip score-strip--bar">
-            <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
-            <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
-          </div>
-          <span class="score-bar-label" style="color:#909399;font-size:12px">请展开各条记录分别评分</span>
         </div>
 
         <!-- 多条记录型 -->
@@ -173,29 +164,6 @@
               <!-- 附件 -->
               <el-divider content-position="left" style="margin:10px 0 6px">附件</el-divider>
               <DwReadonlyAttachments :item="item" :module-key="mod.moduleKey" @preview="(u,n) => previewRef.show(u,n)" />
-              <!-- 子记录评分（仅非季度参考条目） -->
-              <template v-if="!item._readOnly">
-                <el-divider content-position="left" style="margin:10px 0 6px">评分</el-divider>
-                <div class="sub-score-bar">
-                  <span class="score-field-label" style="font-size:12px;color:#606266">本条得分</span>
-                  <el-input-number
-                    v-model="subRecordScores[String(item.id)]"
-                    :min="0"
-                    :precision="1"
-                    :step="0.5"
-                    size="small"
-                    style="width:110px"
-                    controls-position="right"
-                    placeholder="分值"
-                  />
-                  <el-button
-                    type="primary"
-                    size="small"
-                    :loading="savingSubId === String(item.id)"
-                    @click="saveSubRecordScore(mod.moduleKey, item)"
-                  >保存</el-button>
-                </div>
-              </template>
             </el-collapse-item>
           </el-collapse>
           </div>
@@ -397,7 +365,7 @@ const savingSubId     = ref(null)
 function initModuleScores(mods) {
   const s = {}
   mods.forEach(m => {
-    if (m.scoreMax != null && !LIST_MODULES.includes(m.moduleKey)) {
+    if (m.scoreMax != null) {
       s[m.moduleKey] = { score: null }
     }
   })
@@ -472,15 +440,12 @@ const totalSelfScore = computed(() => {
   return vals.length ? vals.reduce((a, b) => a + b, 0) : null
 })
 
-/** 管理员总得分（非列表型 moduleScores + 列表型 subRecordScores 之和） */
+/** 实际总得分（所有模块级 moduleScores 之和） */
 const totalActualScore = computed(() => {
   let total = 0
   let hasAny = false
   Object.values(moduleScores.value).forEach(entry => {
     if (entry?.score != null) { total += Number(entry.score); hasAny = true }
-  })
-  Object.values(subRecordScores.value).forEach(score => {
-    if (score != null) { total += Number(score); hasAny = true }
   })
   return hasAny ? Math.round(total * 10) / 10 : null
 })
