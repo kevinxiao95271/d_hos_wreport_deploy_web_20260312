@@ -451,19 +451,19 @@ const FMT = {
 const SLOT_DEF = {
   meeting:  [
     { slot: 'minutes', field: 'minutes',   label: '会议纪要 / 通知文稿', ...FMT.pdfDocx },
-    { slot: 'photo',   field: 'photos',    label: '现场照片',             ...FMT.imgPdf },
+    { slot: 'photo',   field: 'photos',    label: '现场照片(原图发送)',             ...FMT.imgPdf },
     { slot: 'signin',  field: 'signins',   label: '签到表',               ...FMT.imgPdfDocxXlsx },
   ],
   training: [
     { slot: 'material', field: 'materials', label: '培训材料', ...FMT.pdfDocx },
-    { slot: 'photo',    field: 'photos',    label: '现场照片', ...FMT.imgPdf },
+    { slot: 'photo',    field: 'photos',    label: '现场照片(原图发送)', ...FMT.imgPdf },
   ],
   guidance: [
     { slot: 'evidence', field: 'evidences', label: '佐证材料', ...FMT.pdfDocx },
   ],
   survey: [
     { slot: 'report', field: 'reports', label: '调研报告', ...FMT.pdfDocx },
-    { slot: 'photo',  field: 'photos',  label: '现场照片', ...FMT.imgPdf },
+    { slot: 'photo',  field: 'photos',  label: '现场照片(原图发送)', ...FMT.imgPdf },
   ],
 }
 
