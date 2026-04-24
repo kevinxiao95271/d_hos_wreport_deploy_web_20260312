@@ -197,7 +197,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { getDwModules, initDwRecord, getDwRecord, submitDwRecord, saveDwFieldValues, getDwYearSummary } from '@/api/dailywork'
+import { getDwModules, initDwRecord, submitDwRecord, saveDwFieldValues } from '@/api/dailywork'
+import { sortDwSubRecordsByStartDesc } from '@/utils/dwQuarter'
 import DwSubList          from './components/DwSubList.vue'
 import DwBonusList        from './components/DwBonusList.vue'
 import DwFundingForm      from './components/DwFundingForm.vue'
@@ -213,12 +214,9 @@ const detail      = ref({ status: 0, meetings: [], trainings: [], guidances: [],
 const moduleSelfScores   = ref({})
 const savingSelfScoreKey = ref(null)
 
-const LIST_MODULES      = ['meeting', 'training', 'guidance', 'survey']
-const FILE_MODULES      = ['annual_work', 'it_construction', 'work_plan', 'admin_response', 'activity_report']
-const QUARTERLY_MODULES = ['meeting', 'training', 'guidance', 'survey']
-const DETAIL_KEY        = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
-
-const yearSummaryRows = ref([])
+const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const FILE_MODULES = ['annual_work', 'it_construction', 'work_plan', 'admin_response', 'activity_report']
+const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
 
 const enabledModules = computed(() => {
   const all = (modules.value || []).filter(m => m.isEnabled)
@@ -275,15 +273,20 @@ function isBonusModule(key) {
 function isNetworkBuildModule(key) { return key === 'network_build' }
 
 function getListItems(key) {
-  const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({
-    ...i, _readOnly: detail.value.readOnly === true, _fromQuarter: null,
-  }))
-  // 年度任务：把 Q1-Q4 已通过条目混入前方（灰态）
-  if (isAnnualTask.value && QUARTERLY_MODULES.includes(key)) {
-    const quarterly = yearSummaryRows.value.flatMap(row =>
-      (row.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({ ...i, _readOnly: true, _fromQuarter: row.statQuarter }))
+  // 年度自填条目：按开始时间倒序
+  const own = sortDwSubRecordsByStartDesc(
+    (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _fromQuarter: null, _readOnly: false })),
+    key
+  )
+  // 季度快照：保持后端顺序，只读
+  const snapshots = detail.value.quarterlySnapshots || []
+  if (snapshots.length) {
+    const quarterly = snapshots.flatMap(snap =>
+      (snap.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({
+        ...i, _fromQuarter: snap.statQuarter, _readOnly: true,
+      }))
     )
-    return [...quarterly, ...own]
+    return [...own, ...quarterly]
   }
   return own
 }
@@ -303,19 +306,7 @@ async function loadAll() {
     modules.value = modRes.data || []
     const initData = initRes.data || {}
     detail.value = initData
-    if (initData.recordId) {
-      const recRes = await getDwRecord(initData.recordId)
-      const rec = recRes.data || {}
-      detail.value = { ...initData, ...rec }
-      initModuleSelfScores(rec.moduleSelfScores)
-    } else {
-      initModuleSelfScores(initData.moduleSelfScores)
-    }
-    // 年度任务：加载已通过季度数据，供各模块混入展示（灰态只读）
-    if (isAnnualTask.value && detail.value.statYear) {
-      const res = await getDwYearSummary({ statYear: detail.value.statYear, approvedOnly: true }).catch(() => ({ data: [] }))
-      yearSummaryRows.value = (res.data || []).filter(r => r.statQuarter != null && r.detail)
-    }
+    initModuleSelfScores(initData.moduleSelfScores)
   } finally {
     pageLoading.value = false
   }
@@ -326,14 +317,7 @@ async function reloadDetail() {
     const initRes = await initDwRecord(taskId)
     const initData = initRes.data || {}
     detail.value = initData
-    if (initData.recordId) {
-      const recRes = await getDwRecord(initData.recordId)
-      const rec = recRes.data || {}
-      detail.value = { ...initData, ...rec }
-      initModuleSelfScores(rec.moduleSelfScores)
-    } else {
-      initModuleSelfScores(initData.moduleSelfScores)
-    }
+    initModuleSelfScores(initData.moduleSelfScores)
   } catch { /* ignore */ }
 }
 

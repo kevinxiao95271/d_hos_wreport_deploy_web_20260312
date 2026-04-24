@@ -23,37 +23,25 @@ export function sortDwSubRecordsByStartDesc(items, moduleKey) {
   })
 }
 
-/** quarterIndex 1～4 的默认底色（无 startYearQuarter 时） */
+/** Q1-Q4 底色，Q3 统一使用 Q1 的蓝色调 */
 const QUARTER_INDEX_BG = {
   1: '#e8f4fc',
   2: '#e8fce8',
-  3: '#fcf8e8',
-  4: '#f3e8fc',
-}
-
-/** 有 startYearQuarter 时按字符串哈希取色，使不同年份同季度可区分 */
-const YEAR_Q_PALETTE = [
-  '#e8f4fc', '#e8fce8', '#fcf8e8', '#f3e8fc',
-  '#e8eef8', '#e8fcf4', '#f8f0e8', '#f0e8fc',
-  '#e4f0fc', '#ecf8e8', '#f8f4e8', '#e8eefc',
-]
-
-function hashStringToPalette(str) {
-  let h = 0
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) - h) + str.charCodeAt(i)
-    h |= 0
-  }
-  return YEAR_Q_PALETTE[Math.abs(h) % YEAR_Q_PALETTE.length]
+  3: '#e8f4fc',
+  4: '#e8fce8',
 }
 
 /**
- * 子记录行背景色（读 startYearQuarter / quarterIndex）
+ * 子记录行背景色：优先从 startYearQuarter 解析季度号，其次用 quarterIndex
  * @returns {string} CSS 颜色
  */
 export function dwQuarterBackground(item) {
-  if (item?.startYearQuarter) return hashStringToPalette(String(item.startYearQuarter))
-  const qi = Number(item?.quarterIndex)
+  let qi = 0
+  if (item?.startYearQuarter) {
+    const m = String(item.startYearQuarter).match(/Q(\d)/)
+    if (m) qi = Number(m[1])
+  }
+  if (!qi) qi = Number(item?.quarterIndex)
   if (qi >= 1 && qi <= 4) return QUARTER_INDEX_BG[qi]
   return 'transparent'
 }

@@ -18,9 +18,10 @@
             <div class="collapse-title">
               <div class="title-left">
                 <span class="item-title">{{ itemTitle(item) }}</span>
-                <el-tag v-if="item.startYearQuarter && item._fromQuarter == null" size="small" type="info" effect="plain" class="quarter-tag">{{ item.startYearQuarter }}</el-tag>
               </div>
               <div class="title-right">
+                <span v-if="itemStartDate(item) !== '—'" class="title-mid">{{ itemStartDate(item) }}</span>
+                <el-tag v-if="item.startYearQuarter && item._fromQuarter == null" size="small" type="info" effect="plain" class="quarter-tag">{{ item.startYearQuarter }}</el-tag>
                 <el-tag
                   v-if="item._fromQuarter != null"
                   size="small"
@@ -349,7 +350,7 @@ import {
 import DwAttachSlot  from './DwAttachSlot.vue'
 import DwExtraFields from './DwExtraFields.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
-import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
+import { dwQuarterRowStyle } from '@/utils/dwQuarter'
 
 const props = defineProps({
   moduleKey:    { type: String, required: true },
@@ -369,12 +370,7 @@ const START_DATE_KEY = {
   guidance: 'guidanceStartDate', survey: 'surveyStartDate',
 }
 
-/** 所有条目（季度参考 + 年度自身）统一按开始日期降序 */
-const displayItems = computed(() => {
-  const sk = START_DATE_KEY[props.moduleKey]
-  const all = [...props.items]
-  return sk ? all.sort((a, b) => (b[sk] || '').localeCompare(a[sk] || '')) : all
-})
+const displayItems = computed(() => props.items)
 
 const previewRef      = ref(null)
 const dialogVisible   = ref(false)
@@ -401,8 +397,8 @@ const FIXED_FIELDS = {
       startDateKey: 'meetingStartDate', startHalfKey: 'meetingStartHalf',
       endDateKey:   'meetingEndDate',   endHalfKey:   'meetingEndHalf' },
     { key: 'meetingForm',      label: '会议形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }, { label: '线上+线下', value: 'hybrid' }] },
-    { key: 'attendeeCount',    label: '参会人数',  type: 'number',  placeholder: '人' },
-    { key: 'attendanceRate',   label: '出勤率(%)', type: 'percent' },
+    { key: 'attendeeCount',    label: '参会人数',  type: 'number',  placeholder: '人', required: true },
+    { key: 'attendanceRate',   label: '出勤率(%)', type: 'percent', required: true },
     { key: 'meetingContent',   label: '会议内容',  type: 'text',    placeholder: '简要描述' },
   ],
   training: [
@@ -456,7 +452,7 @@ const SLOT_DEF = {
     { slot: 'signin',  field: 'signins',   label: '签到表',               ...FMT.imgPdfDocxXlsx },
   ],
   training: [
-    { slot: 'material', field: 'materials', label: '培训材料', ...FMT.pdfDocx },
+    { slot: 'material', field: 'materials', label: '培训通知', ...FMT.pdfDocx },
     { slot: 'photo',    field: 'photos',    label: '现场照片(原图发送)', ...FMT.imgPdf },
   ],
   guidance: [
@@ -488,6 +484,22 @@ function collapseItemId(item) {
 
 function itemTitle(item) {
   return item[FORM_LABEL[props.moduleKey]] || `记录 ${item.id}`
+}
+
+function itemStartDate(item) {
+  const module = props.moduleKey
+  const pairs = {
+    meeting:  { s: 'meetingStartDate',  sh: 'meetingStartHalf',  e: 'meetingEndDate',  eh: 'meetingEndHalf'  },
+    training: { s: 'trainingStartDate', sh: 'trainingStartHalf', e: 'trainingEndDate', eh: 'trainingEndHalf' },
+    guidance: { s: 'guidanceStartDate', sh: 'guidanceStartHalf', e: 'guidanceEndDate', eh: 'guidanceEndHalf' },
+    survey:   { s: 'surveyStartDate',   sh: 'surveyStartHalf',   e: 'surveyEndDate',   eh: 'surveyEndHalf'   },
+  }
+  const p = pairs[module]
+  if (!p) return '—'
+  const sD = item[p.s], sH = item[p.sh], eD = item[p.e], eH = item[p.eh]
+  if (sD && eD) return `${sD} ${halfLabel(sH)} → ${eD} ${halfLabel(eH)}`
+  if (sD) return sD
+  return '—'
 }
 
 const LABEL_MAP = {
@@ -525,6 +537,8 @@ const rules = computed(() => {
   fixedFields.value.forEach(fd => {
     if (fd.type !== 'number' && fd.type !== 'percent' && fd.type !== 'timeRange') {
       r[fd.key] = [{ required: true, message: `${fd.label}不能为空`, trigger: 'blur' }]
+    } else if (fd.required && (fd.type === 'number' || fd.type === 'percent')) {
+      r[fd.key] = [{ required: true, type: 'number', message: `${fd.label}不能为空`, trigger: 'change' }]
     }
   })
   return r
@@ -729,10 +743,10 @@ async function handleDelete(item) {
 <style scoped>
 .collapse-title {
   display: flex; align-items: center;
-  justify-content: space-between; width: 100%; padding-right: 12px;
-  gap: 10px;
+  width: 100%; padding-right: 12px; gap: 8px;
 }
-.title-left  { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.title-left  { flex: 1; min-width: 0; }
+.title-mid   { font-size: 13px; color: #909399; flex-shrink: 0; white-space: nowrap; }
 .title-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .item-title  { font-weight: 500; color: #303133; }
 .quarter-tag { flex-shrink: 0; }

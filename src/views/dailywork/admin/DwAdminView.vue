@@ -117,13 +117,16 @@
                     <span>{{ itemTitle(mod.moduleKey, item) }}</span>
                     <el-tag v-if="item.startYearQuarter && item._fromQuarter == null" size="small" type="info" effect="plain">{{ item.startYearQuarter }}</el-tag>
                   </span>
-                  <el-tag
-                    v-if="item._fromQuarter != null"
-                    size="small"
-                    :type="['','primary','success','warning','danger'][item._fromQuarter] || 'info'"
-                    effect="dark"
-                    class="admin-q-badge"
-                  >Q{{ item._fromQuarter }} 季度上报</el-tag>
+                  <span class="admin-title-right">
+                    <span v-if="itemDateRange(mod.moduleKey, item)" class="admin-title-date">{{ itemDateRange(mod.moduleKey, item) }}</span>
+                    <el-tag
+                      v-if="item._fromQuarter != null"
+                      size="small"
+                      :type="['','primary','success','warning','danger'][item._fromQuarter] || 'info'"
+                      effect="dark"
+                      class="admin-q-badge"
+                    >Q{{ item._fromQuarter }} 季度上报</el-tag>
+                  </span>
                 </span>
               </template>
               <el-descriptions :column="2" size="small" border>
@@ -302,7 +305,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, ArrowDown } from '@element-plus/icons-vue'
-import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore, getDwYearSummary } from '@/api/dailywork'
+import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
 import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
@@ -318,10 +321,8 @@ const detail   = ref({})
 const auditRemark = ref('')
 const previewRef  = ref(null)
 
-const LIST_MODULES      = ['meeting', 'training', 'guidance', 'survey']
-const QUARTERLY_MODULES = ['meeting', 'training', 'guidance', 'survey']
-const DETAIL_KEY        = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
-const yearSummaryRows   = ref([])
+const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
 const enabledModules = computed(() => {
   const all = (modules.value || []).filter(m => m.isEnabled)
   const keys = detail.value.enabledModuleKeys
@@ -476,20 +477,26 @@ function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' }
 
 function getListItems(key) {
-  const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _readOnly: false, _fromQuarter: null }))
-  // 年度任务：把 Q1-Q4 已通过条目混入前方（灰态）
-  if (isAnnualTask.value && QUARTERLY_MODULES.includes(key)) {
-    const quarterly = yearSummaryRows.value.flatMap(row =>
-      (row.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({ ...i, _readOnly: true, _fromQuarter: row.statQuarter }))
+  // 年度自填条目：按开始时间倒序
+  const own = sortDwSubRecordsByStartDesc(
+    (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _fromQuarter: null, _readOnly: false })),
+    key
+  )
+  // 季度快照：保持后端顺序，只读
+  const snapshots = detail.value.quarterlySnapshots || []
+  if (snapshots.length) {
+    const quarterly = snapshots.flatMap(snap =>
+      (snap.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({
+        ...i, _fromQuarter: snap.statQuarter, _readOnly: true,
+      }))
     )
-    return [...quarterly, ...own]
+    return [...own, ...quarterly]
   }
   return own
 }
 
-/** 所有条目统一按开始日期降序（季度参考与年度自身一起排） */
 function listItemsSortedForModule(moduleKey) {
-  return sortDwSubRecordsByStartDesc(getListItems(moduleKey), moduleKey)
+  return getListItems(moduleKey)
 }
 
 function getBonusItems(bonusType) {
@@ -498,6 +505,21 @@ function getBonusItems(bonusType) {
 
 const ITEM_NAME_KEY = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget' }
 function itemTitle(moduleKey, item) { return item[ITEM_NAME_KEY[moduleKey]] || `记录 ${item.id}` }
+
+const DATE_PAIRS = {
+  meeting:  { s: 'meetingStartDate',  sh: 'meetingStartHalf',  e: 'meetingEndDate',  eh: 'meetingEndHalf'  },
+  training: { s: 'trainingStartDate', sh: 'trainingStartHalf', e: 'trainingEndDate', eh: 'trainingEndHalf' },
+  guidance: { s: 'guidanceStartDate', sh: 'guidanceStartHalf', e: 'guidanceEndDate', eh: 'guidanceEndHalf' },
+  survey:   { s: 'surveyStartDate',   sh: 'surveyStartHalf',   e: 'surveyEndDate',   eh: 'surveyEndHalf'   },
+}
+function itemDateRange(moduleKey, item) {
+  const p = DATE_PAIRS[moduleKey]
+  if (!p) return ''
+  const sD = item[p.s], sH = item[p.sh], eD = item[p.e], eH = item[p.eh]
+  if (sD && eD) return `${sD} ${adminHalfLabel(sH)} → ${eD} ${adminHalfLabel(eH)}`
+  if (sD) return sD
+  return ''
+}
 
 const ENUM_LABELS = {
   offline: '线下', online: '线上', hybrid: '线上+线下',
@@ -604,12 +626,6 @@ async function loadAll() {
     detail.value  = detailRes.data || {}
     initModuleScores(modules.value)
     initSubRecordScores(detail.value)
-    // 年度任务：加载已通过季度数据，供各模块混入展示（灰态只读）
-    if (isAnnualTask.value && detail.value.statYear) {
-      const orgId = detail.value.orgId ? String(detail.value.orgId) : null
-      const res = await getDwYearSummary({ statYear: detail.value.statYear, approvedOnly: true, orgId }).catch(() => ({ data: [] }))
-      yearSummaryRows.value = (res.data || []).filter(r => r.statQuarter != null && r.detail)
-    }
   } finally { loading.value = false }
 }
 
@@ -909,8 +925,10 @@ onMounted(loadAll)
   width: 100%;
   padding-right: 8px;
 }
-.admin-title-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
-.admin-q-badge    { font-weight: 700; flex-shrink: 0; }
+.admin-title-main  { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.admin-title-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.admin-title-date  { font-size: 13px; color: #909399; white-space: nowrap; }
+.admin-q-badge     { font-weight: 700; flex-shrink: 0; }
 .dw-admin-quarter-row :deep(.el-collapse-item__header) {
   background-color: var(--quarter-bg, transparent) !important;
 }
