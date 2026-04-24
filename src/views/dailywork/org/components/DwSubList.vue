@@ -443,9 +443,10 @@ const DISPLAY_EXTRA = {
 }
 
 const FMT = {
-  pdfDocx:        { accept: '.pdf,.docx,.doc',                            hint: '支持 PDF / DOCX' },
-  imgPdf:         { accept: '.jpg,.jpeg,.png,.gif,.pdf',                  hint: '支持 JPG / PNG / GIF / PDF' },
-  imgPdfDocxXlsx: { accept: '.jpg,.jpeg,.png,.gif,.pdf,.docx,.doc,.xlsx', hint: '支持 JPG / PNG / GIF / PDF / DOCX / XLSX' },
+  pdfDocx:        { accept: '.pdf,.docx,.doc',                                        hint: '支持 PDF / DOCX' },
+  pdfDocxZip:     { accept: '.pdf,.docx,.doc,.zip,.rar',                              hint: '支持 PDF / DOCX / ZIP / RAR' },
+  imgPdf:         { accept: '.jpg,.jpeg,.png,.gif,.pdf',                              hint: '支持 JPG / PNG / GIF / PDF' },
+  imgPdfDocxXlsx: { accept: '.jpg,.jpeg,.png,.gif,.pdf,.docx,.doc,.xlsx',             hint: '支持 JPG / PNG / GIF / PDF / DOCX / XLSX' },
 }
 
 const SLOT_DEF = {
@@ -459,7 +460,7 @@ const SLOT_DEF = {
     { slot: 'photo',    field: 'photos',    label: '现场照片(原图发送)', ...FMT.imgPdf },
   ],
   guidance: [
-    { slot: 'evidence', field: 'evidences', label: '佐证材料', ...FMT.pdfDocx },
+    { slot: 'evidence', field: 'evidences', label: '佐证材料', ...FMT.pdfDocxZip },
   ],
   survey: [
     { slot: 'report', field: 'reports', label: '调研报告', ...FMT.pdfDocx },
