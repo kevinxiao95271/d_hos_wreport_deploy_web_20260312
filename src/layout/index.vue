@@ -32,6 +32,10 @@
             <el-icon><Setting /></el-icon>
             <span>日常工作配置</span>
           </el-menu-item>
+          <el-menu-item index="/score/board414">
+            <el-icon><DataLine /></el-icon>
+            <span>得分看板4.14</span>
+          </el-menu-item>
         </template>
         <template v-else>
           <el-menu-item index="/org/task-list">
