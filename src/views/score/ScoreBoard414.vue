@@ -11,7 +11,7 @@
           <table class="score-table">
             <thead>
               <tr class="header-row-1">
-                <th rowspan="2" class="col-fixed col-seq">序号</th>
+                <th rowspan="2" class="col-fixed col-seq sort-th" @click="toggleSort('seq')">序号{{ sortArrow('seq') }}</th>
                 <th rowspan="2" class="col-fixed col-name">质控中心</th>
                 <th colspan="4" class="group-header">
                   1. 制定本专业质量管理体系
@@ -37,8 +37,8 @@
                   附加分
                   <span class="max-score">（10分）</span>
                 </th>
-                <th rowspan="2" class="col-total">总分</th>
-                <th rowspan="2" class="col-total col-total-bonus">总分<br/>（含附加）</th>
+                <th rowspan="2" class="col-total sort-th" @click="toggleSort('total')">总分{{ sortArrow('total') }}</th>
+                <th rowspan="2" class="col-total col-total-bonus sort-th" @click="toggleSort('bonus')">总分<br/>（含附加）{{ sortArrow('bonus') }}</th>
               </tr>
               <tr class="header-row-2">
                 <th class="sub-header">年度计划<br/>总结<br/><span class="max">10</span></th>
@@ -65,7 +65,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="(row, idx) in qkData"
+                v-for="(row, idx) in sortedData(qkData)"
                 :key="idx"
                 :class="{ 'row-odd': idx % 2 === 0 }"
               >
@@ -90,7 +90,7 @@
           <table class="score-table">
             <thead>
               <tr class="header-row-1">
-                <th rowspan="2" class="col-fixed col-seq">序号</th>
+                <th rowspan="2" class="col-fixed col-seq sort-th" @click="toggleSort('seq')">序号{{ sortArrow('seq') }}</th>
                 <th rowspan="2" class="col-fixed col-name">技术指导中心</th>
                 <th colspan="4" class="group-header">
                   1. 制定本专业质量管理体系
@@ -116,8 +116,8 @@
                   附加分
                   <span class="max-score">（10分）</span>
                 </th>
-                <th rowspan="2" class="col-total">总分</th>
-                <th rowspan="2" class="col-total col-total-bonus">总分<br/>（含附加）</th>
+                <th rowspan="2" class="col-total sort-th" @click="toggleSort('total')">总分{{ sortArrow('total') }}</th>
+                <th rowspan="2" class="col-total col-total-bonus sort-th" @click="toggleSort('bonus')">总分<br/>（含附加）{{ sortArrow('bonus') }}</th>
               </tr>
               <tr class="header-row-2">
                 <th class="sub-header">年度计划<br/>总结<br/><span class="max">10</span></th>
@@ -144,7 +144,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="(row, idx) in jsData"
+                v-for="(row, idx) in sortedData(jsData)"
                 :key="idx"
                 :class="{ 'row-odd': idx % 2 === 0 }"
               >
@@ -167,9 +167,36 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const activeTab = ref('qk')
+
+// 排序状态：默认按总分（含附加）倒序
+const sortKey = ref('bonus')   // 'seq' | 'total' | 'bonus'
+const sortDir = ref('desc')
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc'
+  } else {
+    sortKey.value = key
+    sortDir.value = key === 'seq' ? 'asc' : 'desc'
+  }
+}
+
+function sortArrow(key) {
+  if (sortKey.value !== key) return ''
+  return sortDir.value === 'desc' ? ' ▼' : ' ▲'
+}
+
+function sortedData(data) {
+  const colIdx = sortKey.value === 'seq' ? 0 : sortKey.value === 'total' ? 22 : 23
+  return [...data].sort((a, b) => {
+    const va = Number(a[colIdx]) || 0
+    const vb = Number(b[colIdx]) || 0
+    return sortDir.value === 'desc' ? vb - va : va - vb
+  })
+}
 
 // 各子项列索引（cols 2-21）和对应满分
 const scoreColIndices = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
@@ -448,5 +475,13 @@ const jsData = [
 
 .score-na {
   color: #c0c4cc;
+}
+
+.sort-th {
+  cursor: pointer;
+  user-select: none;
+}
+.sort-th:hover {
+  background: #d9ecff !important;
 }
 </style>
