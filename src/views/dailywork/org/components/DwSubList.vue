@@ -343,6 +343,7 @@ import {
   saveTraining, deleteTraining,
   saveGuidance, deleteGuidance,
   saveSurvey, deleteSurvey,
+  saveDataAnalysis, deleteDataAnalysis,
   saveDwFieldValues,
   uploadDwAttachment,
   getGuidanceRegions,
@@ -428,6 +429,10 @@ const FIXED_FIELDS = {
     { key: 'surveyForm',    label: '调研方式', type: 'select', options: [{ label: '现场', value: 'onsite' }, { label: '线上', value: 'online' }] },
     { key: 'surveyContent', label: '调研内容', type: 'text',   placeholder: '简要描述' },
   ],
+  data_analysis_report: [
+    { key: 'reportName', label: '报告名称', type: 'text', placeholder: '请输入报告名称' },
+    { key: 'reportDate', label: '报告日期', type: 'date' },
+  ],
 }
 
 // 只读展示字段（guidance 追加市级中心，县级单独分组渲染）
@@ -462,10 +467,13 @@ const SLOT_DEF = {
     { slot: 'report', field: 'reports', label: '调研报告', ...FMT.pdfDocx },
     { slot: 'photo',  field: 'photos',  label: '现场照片(原图发送)', ...FMT.imgPdf },
   ],
+  data_analysis_report: [
+    { slot: 'file', field: 'files', label: '报告文件', ...FMT.pdfDocxZip },
+  ],
 }
 
-const SAVE_FN   = { meeting: saveMeeting,   training: saveTraining,   guidance: saveGuidance,   survey: saveSurvey }
-const DELETE_FN = { meeting: deleteMeeting, training: deleteTraining, guidance: deleteGuidance, survey: deleteSurvey }
+const SAVE_FN   = { meeting: saveMeeting,   training: saveTraining,   guidance: saveGuidance,   survey: saveSurvey,   data_analysis_report: saveDataAnalysis }
+const DELETE_FN = { meeting: deleteMeeting, training: deleteTraining, guidance: deleteGuidance, survey: deleteSurvey, data_analysis_report: deleteDataAnalysis }
 
 const fixedFields   = computed(() => FIXED_FIELDS[props.moduleKey] || [])
 const displayFields = computed(() => {
@@ -475,7 +483,7 @@ const displayFields = computed(() => {
 })
 const slotDef = computed(() => SLOT_DEF[props.moduleKey] || [])
 
-const FORM_LABEL = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget' }
+const FORM_LABEL = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget', data_analysis_report: 'reportName' }
 
 /** 折叠面板 name 必须用字符串，避免 Snowflake id 超过 Number 安全整数时与 v-model 对不上、无法展开 */
 function collapseItemId(item) {
@@ -488,6 +496,7 @@ function itemTitle(item) {
 
 function itemStartDate(item) {
   const module = props.moduleKey
+  if (module === 'data_analysis_report') return item.reportDate || '—'
   const pairs = {
     meeting:  { s: 'meetingStartDate',  sh: 'meetingStartHalf',  e: 'meetingEndDate',  eh: 'meetingEndHalf'  },
     training: { s: 'trainingStartDate', sh: 'trainingStartHalf', e: 'trainingEndDate', eh: 'trainingEndHalf' },
@@ -535,7 +544,9 @@ function formatFixed(item, fd) {
 const rules = computed(() => {
   const r = {}
   fixedFields.value.forEach(fd => {
-    if (fd.type !== 'number' && fd.type !== 'percent' && fd.type !== 'timeRange') {
+    if (fd.type === 'date') {
+      r[fd.key] = [{ required: true, message: `${fd.label}不能为空`, trigger: 'change' }]
+    } else if (fd.type !== 'number' && fd.type !== 'percent' && fd.type !== 'timeRange') {
       r[fd.key] = [{ required: true, message: `${fd.label}不能为空`, trigger: 'blur' }]
     } else if (fd.required && (fd.type === 'number' || fd.type === 'percent')) {
       r[fd.key] = [{ required: true, type: 'number', message: `${fd.label}不能为空`, trigger: 'change' }]
