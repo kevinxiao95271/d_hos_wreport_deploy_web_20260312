@@ -5,23 +5,23 @@
         <span class="qref-title">各季度填报参考（只读）</span>
         <span class="qref-chips">
           <el-tag
-            v-for="qrow in quarterRows" :key="qrow.statQuarter"
+            v-for="qrow in displayQuarterRows" :key="qrow.statQuarter"
             size="small"
             type="success"
             effect="plain"
             class="qref-chip"
           >Q{{ qrow.statQuarter }}&nbsp;✓</el-tag>
-          <span v-if="!loading && !quarterRows.length" class="qref-no-data">暂无已通过季度</span>
+          <span v-if="!loading && !displayQuarterRows.length" class="qref-no-data">暂无已通过季度</span>
         </span>
         <el-icon :class="['qref-toggle', { 'is-collapsed': !panelExpanded }]"><ArrowDown /></el-icon>
       </div>
     </template>
 
     <div v-show="panelExpanded">
-      <el-empty v-if="!loading && !quarterRows.length" description="暂无已通过的季度记录" :image-size="50" />
+      <el-empty v-if="!loading && !displayQuarterRows.length" description="暂无已通过的季度记录" :image-size="50" />
       <el-collapse v-else v-model="activeQuarters" class="qref-collapse">
-        <!-- 只渲染 API 返回的有已通过数据的季度，无数据季度不占位 -->
-        <el-collapse-item v-for="qrow in quarterRows" :key="qrow.statQuarter" :name="qrow.statQuarter">
+        <!-- 仅展示该季度下存在列表/加分/经费或自评分等实质内容的已通过折叠项 -->
+        <el-collapse-item v-for="qrow in displayQuarterRows" :key="qrow.statQuarter" :name="qrow.statQuarter">
           <template #title>
             <span class="qref-q-num">Q{{ qrow.statQuarter }}</span>
             <span class="qref-q-name">{{ qrow.taskName || `第${qrow.statQuarter}季度` }}</span>
@@ -32,7 +32,7 @@
             <!-- 灰态容器：pointer-events:none -->
             <div class="qref-detail-readonly">
               <template v-for="mk in visibleModules(qrow.detail)" :key="mk">
-                <div class="qref-mod-section">
+                <div v-if="moduleHasReferenceContent(qrow.detail, mk)" class="qref-mod-section">
                   <div class="qref-mod-title">{{ MOD_NAMES[mk] }}</div>
 
                   <!-- 多条列表型 -->
@@ -92,6 +92,11 @@
                             <template #default="{ row: r }">{{ FORM_LABEL[r.surveyForm] || r.surveyForm }}</template>
                           </el-table-column>
                         </template>
+
+                        <template v-else-if="mk === 'data_analysis_report'">
+                          <el-table-column prop="reportName" label="报告名称" min-width="140" show-overflow-tooltip />
+                          <el-table-column prop="reportDate" label="报告日期" width="110" />
+                        </template>
                       </el-table>
                     </template>
                     <div v-else class="qref-empty">暂无记录</div>
@@ -123,18 +128,12 @@
 
                   <!-- 经费执行 -->
                   <template v-else-if="mk === 'funding'">
-                    <el-descriptions :column="2" size="small" border v-if="qrow.detail.funding">
+                    <el-descriptions :column="2" size="small" border>
                       <el-descriptions-item label="财政拨款（万元）">{{ qrow.detail.funding.fiscalAppropriationWan ?? '—' }}</el-descriptions-item>
                       <el-descriptions-item label="财政执行率">{{ qrow.detail.funding.fiscalExecutionRate ?? '—' }}%</el-descriptions-item>
                       <el-descriptions-item label="医院自筹（万元）">{{ qrow.detail.funding.hospitalAppropriationWan ?? '—' }}</el-descriptions-item>
                       <el-descriptions-item label="医院执行率">{{ qrow.detail.funding.hospitalExecutionRate ?? '—' }}%</el-descriptions-item>
                     </el-descriptions>
-                    <div v-else class="qref-empty">暂无经费数据</div>
-                  </template>
-
-                  <!-- 纯上传模块：仅提示 -->
-                  <template v-else>
-                    <div class="qref-upload-hint">{{ MOD_NAMES[mk] }}（附件仅在完整记录页查看）</div>
                   </template>
                 </div>
               </template>
@@ -152,8 +151,6 @@
               </div>
             </div>
           </template>
-
-          <el-empty v-else description="该季度暂无已通过的记录" :image-size="40" />
         </el-collapse-item>
       </el-collapse>
     </div>
@@ -170,13 +167,14 @@ const props = defineProps({
   orgId:    { type: String, default: null },
 })
 
-const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
-const ALL_ORDERED  = ['meeting', 'training', 'guidance', 'survey',
+const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey', 'data_analysis_report']
+const ALL_ORDERED  = ['meeting', 'training', 'guidance', 'survey', 'data_analysis_report',
   'annual_work', 'it_construction', 'work_plan', 'admin_response',
   'activity_report', 'funding', 'bonus_pub', 'bonus_comp']
 
 const MOD_NAMES = {
   meeting: '质控会议', training: '质控培训', guidance: '质控指导', survey: '质控调研',
+  data_analysis_report: '数据分析报告',
   annual_work: '年度工作落实', it_construction: '信息化建设', work_plan: '工作计划总结',
   admin_response: '行政指令响应', activity_report: '质控活动报备', funding: '经费执行',
   bonus_pub: '加分项-丛书/指南', bonus_comp: '加分项-技能竞赛',
@@ -194,6 +192,18 @@ const quarterRows = computed(() =>
   rows.value.filter(r => r.statQuarter != null).sort((a, b) => a.statQuarter - b.statQuarter)
 )
 
+/** 季度折叠：无 detail、无列表/加分/经费且无私评分时整项不展示 */
+function quarterRowHasReferenceContent(qrow) {
+  const d = qrow?.detail
+  if (!d) return false
+  if (hasSelfScores(d)) return true
+  return visibleModules(d).some(mk => moduleHasReferenceContent(d, mk))
+}
+
+const displayQuarterRows = computed(() =>
+  quarterRows.value.filter(quarterRowHasReferenceContent)
+)
+
 function visibleModules(detail) {
   const keys = detail.enabledModuleKeys
   if (!Array.isArray(keys) || !keys.length) return ALL_ORDERED
@@ -201,8 +211,32 @@ function visibleModules(detail) {
 }
 
 function listItems(detail, mk) {
-  const map = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
+  const map = {
+    meeting: 'meetings',
+    training: 'trainings',
+    guidance: 'guidances',
+    survey: 'surveys',
+    data_analysis_report: 'dataAnalysisReports',
+  }
   return detail[map[mk]] || []
+}
+
+function fundingHasValues(f) {
+  if (!f || typeof f !== 'object') return false
+  const keys = ['fiscalAppropriationWan', 'fiscalExecutionRate', 'hospitalAppropriationWan', 'hospitalExecutionRate']
+  return keys.some(k => {
+    const v = f[k]
+    return v !== null && v !== undefined && v !== ''
+  })
+}
+
+/** 某模块在参考面板中是否有可展示的数据（空子节点则不渲染该模块块） */
+function moduleHasReferenceContent(detail, mk) {
+  if (LIST_MODULES.includes(mk)) return listItems(detail, mk).length > 0
+  if (mk === 'bonus_pub') return getBonuses(detail, 'publication').length > 0
+  if (mk === 'bonus_comp') return getBonuses(detail, 'competition').length > 0
+  if (mk === 'funding') return fundingHasValues(detail.funding)
+  return false
 }
 
 function getBonuses(detail, bonusType) {
@@ -214,6 +248,15 @@ function hasSelfScores(detail) {
   return sc && Object.keys(sc).length > 0
 }
 
+watch(displayQuarterRows, (list) => {
+  if (!list.length) {
+    activeQuarters.value = []
+    return
+  }
+  if (list.some(r => r.statQuarter === 1)) activeQuarters.value = [1]
+  else activeQuarters.value = [list[0].statQuarter]
+}, { immediate: true })
+
 async function load() {
   if (!props.statYear) return
   loading.value = true
@@ -222,8 +265,6 @@ async function load() {
     if (props.orgId) params.orgId = props.orgId
     const res = await getDwYearSummary(params)
     rows.value = res.data || []
-    // 默认展开 Q1
-    if (rows.value.some(r => r.statQuarter === 1)) activeQuarters.value = [1]
   } catch { rows.value = [] } finally { loading.value = false }
 }
 
