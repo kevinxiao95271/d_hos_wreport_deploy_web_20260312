@@ -29,8 +29,10 @@ export const saveGuidance   = (data) => request.post('/dw/record/guidance/save',
 export const deleteGuidance = (id)   => request.post(`/dw/record/guidance/delete/${id}`)
 export const saveSurvey     = (data) => request.post('/dw/record/survey/save', data)
 export const deleteSurvey   = (id)   => request.post(`/dw/record/survey/delete/${id}`)
-export const saveBonus      = (data) => request.post('/dw/record/bonus/save', data)
-export const deleteBonus    = (id)   => request.post(`/dw/record/bonus/delete/${id}`)
+export const saveBonus            = (data) => request.post('/dw/record/bonus/save', data)
+export const deleteBonus          = (id)   => request.post(`/dw/record/bonus/delete/${id}`)
+export const saveDataAnalysis     = (data) => request.post('/dw/record/data-analysis/save', data)
+export const deleteDataAnalysis   = (id)   => request.post(`/dw/record/data-analysis/delete/${id}`)
 export const saveFunding        = (data) => request.post('/dw/record/funding/save', data)
 export const saveNetworkBuild   = (data) => request.post('/dw/record/network-build/save', data)
 

@@ -34,7 +34,8 @@ const SLOT_DEF = {
   meeting:  [{ slot: 'minutes', field: 'minutes', label: '会议纪要/通知稿' }, { slot: 'photo', field: 'photos', label: '现场照片(原图发送)' }, { slot: 'signin', field: 'signins', label: '签到表' }],
   training: [{ slot: 'material', field: 'materials', label: '培训通知' }, { slot: 'photo', field: 'photos', label: '现场照片(原图发送)' }],
   guidance: [{ slot: 'evidence', field: 'evidences', label: '佐证材料' }],
-  survey:   [{ slot: 'report', field: 'reports', label: '调研报告' }, { slot: 'photo', field: 'photos', label: '现场照片(原图发送)' }],
+  survey:               [{ slot: 'report', field: 'reports', label: '调研报告' }, { slot: 'photo', field: 'photos', label: '现场照片(原图发送)' }],
+  data_analysis_report: [{ slot: 'file',   field: 'files',   label: '报告文件' }],
 }
 
 const slotDef = computed(() => SLOT_DEF[props.moduleKey] || [])

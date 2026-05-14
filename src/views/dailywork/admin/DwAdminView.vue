@@ -20,7 +20,7 @@
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
 
       <!-- ══ 一级大类横幅 ══ -->
-      <template v-if="mod.isLeaf === false">
+      <template v-if="mod.isLeaf === false && catHasLeafChildren(mod.moduleKey)">
         <div
           :class="['cat-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
           @click="toggleModule(mod.moduleKey)"
@@ -30,7 +30,7 @@
             <span class="cat-banner-name">{{ mod.moduleName }}</span>
           </div>
           <div class="cat-banner-right">
-            <span v-if="mod.scoreMax != null" class="cat-score-badge">
+            <span v-if="mod.scoreMax != null && !isQuarterlyTask" class="cat-score-badge">
               <span class="cat-score-label">满分</span>
               <span class="cat-score-val">{{ mod.scoreMax }}</span>
               <span class="cat-score-unit">分</span>
@@ -52,7 +52,7 @@
               <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
               <span class="module-name-admin">{{ mod.moduleName }}</span>
               <!-- 折叠：满分 · 自评分 · 实际得分 -->
-              <div v-if="mod.scoreMax != null && isCollapsed(mod.moduleKey)" class="score-strip score-strip--header">
+              <div v-if="mod.scoreMax != null && isCollapsed(mod.moduleKey) && !isQuarterlyTask" class="score-strip score-strip--header">
                 <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
                 <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
                 <span class="score-field" v-if="!isListModule(mod.moduleKey)"><span class="score-field-label">实际得分</span><span class="score-field-val score-field-val--act">{{ moduleScores[mod.moduleKey]?.score ?? '—' }}</span></span>
@@ -60,7 +60,7 @@
             </div>
             <div class="module-meta">
               <div v-if="mod.scoreDesc" class="meta-box meta-box--desc">
-                <span class="meta-box-label">考核说明</span>
+                <span class="meta-box-label">填写说明</span>
                 <span class="meta-box-text">{{ mod.scoreDesc }}</span>
               </div>
               <div v-if="mod.scoreRule" class="meta-box meta-box--rule">
@@ -73,8 +73,8 @@
 
         <div v-show="!isCollapsed(mod.moduleKey)">
 
-        <!-- 评分行：所有有 scoreMax 的模块均在此处统一打分 -->
-        <div v-if="mod.scoreMax != null" class="score-input-bar">
+        <!-- 评分行：所有有 scoreMax 的模块均在此处统一打分（季度任务不打分） -->
+        <div v-if="mod.scoreMax != null && !isQuarterlyTask" class="score-input-bar">
           <div class="score-strip score-strip--bar">
             <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
             <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
@@ -247,8 +247,8 @@
 
     </template><!-- /enabledModules loop -->
 
-    <!-- 总分汇总 -->
-    <div class="score-summary-bar" style="margin-top:20px">
+    <!-- 总分汇总（季度任务不展示） -->
+    <div v-if="!isQuarterlyTask" class="score-summary-bar" style="margin-top:20px">
       <div class="score-summary-title">评分汇总</div>
       <div class="score-summary-cells">
         <div class="score-summary-cell score-summary-cell--max">
@@ -321,8 +321,8 @@ const detail   = ref({})
 const auditRemark = ref('')
 const previewRef  = ref(null)
 
-const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
-const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
+const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey', 'data_analysis_report']
+const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys', data_analysis_report: 'dataAnalysisReports' }
 const enabledModules = computed(() => {
   const all = (modules.value || []).filter(m => m.isEnabled)
   const keys = detail.value.enabledModuleKeys
@@ -338,6 +338,14 @@ const enabledModules = computed(() => {
 const isAnnualTask = computed(() =>
   detail.value.taskType === 'daily_work' && detail.value.statQuarter == null && !!detail.value.statYear
 )
+
+/** 季度任务：statQuarter 非空时隐藏分值、评分行、总分汇总 */
+const isQuarterlyTask = computed(() => detail.value.statQuarter != null)
+
+/** 大类下是否有已启用的叶子模块（无子则隐藏大类横幅） */
+function catHasLeafChildren(catKey) {
+  return enabledModules.value.some(m => m.isLeaf !== false && m.parentModuleKey === catKey)
+}
 
 // 模块折叠状态
 const collapsedKeys = ref(new Set())
@@ -459,6 +467,7 @@ const CAT_COLOR_MAP = {
   cat_report:     'orange',
   cat_compliance: 'green',
   cat_bonus:      'gold',
+  cat_analysis:   'teal',
 }
 function catColorKey(key) { return CAT_COLOR_MAP[key] || 'blue' }
 
@@ -470,6 +479,7 @@ const LEAF_ACCENT_MAP = {
   indicator_monitor: 'orange', national_report: 'orange', prov_report: 'orange',
   activity_report: 'green', funding: 'green',
   bonus_pub: 'gold', bonus_comp: 'gold', bonus_admin: 'gold',
+  data_analysis_report: 'teal',
 }
 function leafAccentKey(key) { return LEAF_ACCENT_MAP[key] || 'blue' }
 
@@ -503,7 +513,7 @@ function getBonusItems(bonusType) {
   return (detail.value.bonuses || []).filter(b => b.bonusType === bonusType)
 }
 
-const ITEM_NAME_KEY = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget' }
+const ITEM_NAME_KEY = { meeting: 'meetingName', training: 'trainingName', guidance: 'guidanceContent', survey: 'surveyTarget', data_analysis_report: 'reportName' }
 function itemTitle(moduleKey, item) { return item[ITEM_NAME_KEY[moduleKey]] || `记录 ${item.id}` }
 
 const DATE_PAIRS = {
@@ -513,6 +523,7 @@ const DATE_PAIRS = {
   survey:   { s: 'surveyStartDate',   sh: 'surveyStartHalf',   e: 'surveyEndDate',   eh: 'surveyEndHalf'   },
 }
 function itemDateRange(moduleKey, item) {
+  if (moduleKey === 'data_analysis_report') return item.reportDate || ''
   const p = DATE_PAIRS[moduleKey]
   if (!p) return ''
   const sD = item[p.s], sH = item[p.sh], eD = item[p.e], eH = item[p.eh]
@@ -535,6 +546,7 @@ const FIELD_NAMES = {
   surveyStartDate: '调研时间',
   surveyType: '调研类型', surveyForm: '调研方式', surveyTarget: '调研对象',
   pubDate: '出版日期', compStartDate: '举办时间',
+  reportDate: '报告日期',
 }
 
 // 时间区间字段：startDateKey → [startHalfKey, endDateKey, endHalfKey, label]
@@ -550,9 +562,9 @@ const adminHalfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
 function flattenItem(moduleKey, item) {
   const skip = new Set([
     'id', 'recordId', 'delFlag', 'createUser', 'createTime', 'updateTime', 'extraValues',
-    'minutes', 'photos', 'signins', 'materials', 'evidences', 'reports',
+    'minutes', 'photos', 'signins', 'materials', 'evidences', 'reports', 'files',
     'meetingContent', 'trainingContent', 'guidanceContent', 'surveyContent',
-    'meetingName', 'trainingName', 'surveyTarget',
+    'meetingName', 'trainingName', 'surveyTarget', 'reportName',
     // guidance 机构相关：全部单独渲染，不进 flattenItem
     'cityCenterIds', 'countyCenterIds', 'cityCenterCount', 'countyCenterCount',
     'cityCenterNames', 'countyCenterNames', 'countyCenterGroups',

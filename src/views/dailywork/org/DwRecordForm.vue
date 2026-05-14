@@ -22,7 +22,7 @@
     <template v-for="mod in enabledModules" :key="mod.moduleKey">
 
       <!-- ══ 一级大类横幅 ══ -->
-      <template v-if="mod.isLeaf === false">
+      <template v-if="mod.isLeaf === false && catHasLeafChildren(mod.moduleKey)">
         <div
           :class="['cat-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
           @click="toggleModule(mod.moduleKey)"
@@ -32,7 +32,7 @@
             <span class="cat-banner-name">{{ mod.moduleName }}</span>
           </div>
           <div class="cat-banner-right">
-            <span v-if="mod.scoreMax" class="cat-score-badge">
+            <span v-if="mod.scoreMax && !isQuarterlyTask" class="cat-score-badge">
               <span class="cat-score-label">满分</span>
               <span class="cat-score-val">{{ mod.scoreMax }}</span>
               <span class="cat-score-unit">分</span>
@@ -55,13 +55,13 @@
             <div class="module-header-left">
               <el-icon :class="['toggle-icon', { 'is-collapsed': isCollapsed(mod.moduleKey) }]"><ArrowDown /></el-icon>
               <span class="module-name">{{ mod.moduleName }}</span>
-              <div v-if="mod.scoreMax" class="score-strip score-strip--header">
+              <div v-if="mod.scoreMax && !isQuarterlyTask" class="score-strip score-strip--header">
                 <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
                 <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScores[mod.moduleKey] ?? '—' }}</span></span>
               </div>
             </div>
             <div v-if="mod.scoreDesc" class="module-score-desc">
-              <span class="score-desc-label">考核说明</span>
+              <span class="score-desc-label">填写说明</span>
               <span class="score-desc-text">{{ mod.scoreDesc }}</span>
             </div>
           </div>
@@ -70,7 +70,7 @@
         <div v-show="!isCollapsed(mod.moduleKey)">
 
         <!-- 模块自评分输入行 -->
-        <div v-if="editable && mod.scoreMax" class="module-self-score-editor" @click.stop>
+        <div v-if="editable && mod.scoreMax && !isQuarterlyTask" class="module-self-score-editor" @click.stop>
           <div class="score-strip score-strip--bar">
             <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
             <span class="score-field score-field--input">
@@ -210,13 +210,13 @@ const taskId     = route.params.taskId
 const pageLoading = ref(true)
 const submitting  = ref(false)
 const modules     = ref([])
-const detail      = ref({ status: 0, meetings: [], trainings: [], guidances: [], surveys: [], bonuses: [], funding: null, fundingExtra: {} })
+const detail      = ref({ status: 0, meetings: [], trainings: [], guidances: [], surveys: [], dataAnalysisReports: [], bonuses: [], funding: null, fundingExtra: {} })
 const moduleSelfScores   = ref({})
 const savingSelfScoreKey = ref(null)
 
-const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey', 'data_analysis_report']
 const FILE_MODULES = ['annual_work', 'it_construction', 'work_plan', 'admin_response', 'activity_report']
-const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys' }
+const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'guidances', survey: 'surveys', data_analysis_report: 'dataAnalysisReports' }
 
 const enabledModules = computed(() => {
   const all = (modules.value || []).filter(m => m.isEnabled)
@@ -231,6 +231,14 @@ const enabledModules = computed(() => {
 
 /** 年度任务（statQuarter=null）：旁挂季度参考面板 */
 const isAnnualTask = computed(() => detail.value.taskType === 'daily_work' && detail.value.statQuarter == null && !!detail.value.statYear)
+
+/** 季度任务：statQuarter 非空时隐藏分值、自评分 */
+const isQuarterlyTask = computed(() => detail.value.statQuarter != null)
+
+/** 大类下是否有已启用的叶子模块（无子则隐藏大类横幅） */
+function catHasLeafChildren(catKey) {
+  return enabledModules.value.some(m => m.isLeaf !== false && m.parentModuleKey === catKey)
+}
 
 const editable       = computed(() => detail.value.status === 0 || detail.value.status === 3)
 
@@ -251,6 +259,7 @@ const CAT_COLOR_MAP = {
   cat_report:     'orange',
   cat_compliance: 'green',
   cat_bonus:      'gold',
+  cat_analysis:   'teal',
 }
 function catColorKey(key) { return CAT_COLOR_MAP[key] || 'blue' }
 
@@ -262,6 +271,7 @@ const LEAF_ACCENT_MAP = {
   indicator_monitor: 'orange', national_report: 'orange', prov_report: 'orange',
   activity_report: 'green', funding: 'green',
   bonus_pub: 'gold', bonus_comp: 'gold', bonus_admin: 'gold',
+  data_analysis_report: 'teal',
 }
 function leafAccentKey(key) { return LEAF_ACCENT_MAP[key] || 'blue' }
 
@@ -367,7 +377,7 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.dw-form-page { max-width: 960px; margin: 0 auto; }
+.dw-form-page { max-width: 1200px; margin: 0 auto; }
 
 /* ══════════════════════════════════════
    一级大类横幅（浅色专业风格）
@@ -464,7 +474,7 @@ onMounted(loadAll)
 /* ══════════════════════════════════════
    二级叶子模块卡片
 ══════════════════════════════════════ */
-.leaf-card-wrap { margin-bottom: 12px; margin-left: 12px; }
+.leaf-card-wrap { margin-bottom: 10px; margin-left: 6px; }
 .module-card { }
 .module-card--leaf {
   border-left-width: 4px !important;
