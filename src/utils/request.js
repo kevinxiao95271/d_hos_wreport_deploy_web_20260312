@@ -2,7 +2,11 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
-const request = axios.create({ timeout: 30000 })
+// 开发环境 VITE_API_PREFIX 为空，走 vite proxy；生产为 /wreport-api，由 nginx 反代后端
+const request = axios.create({
+  baseURL: import.meta.env.VITE_API_PREFIX || '',
+  timeout: 30000
+})
 
 request.interceptors.request.use(config => {
   const token = localStorage.getItem('wr_token')

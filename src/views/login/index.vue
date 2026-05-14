@@ -27,6 +27,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { login } from '@/api/auth'
+import { isWreportAdmin } from '@/utils/roles'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -47,7 +48,7 @@ async function handleLogin() {
   try {
     const res = await login(form.value)
     userStore.setUser(res.data)
-    router.push(res.data.roleCode === 'deptAdmin' ? '/admin/template-list' : '/org/task-list')
+    router.push(isWreportAdmin(res.data.roleCode) ? '/admin/template-list' : '/org/task-list')
   } catch {
     // ElMessage already shown by request interceptor
   } finally {

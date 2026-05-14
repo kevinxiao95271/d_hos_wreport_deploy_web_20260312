@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { useUserStore } from '@/store/user'
+import { isWreportAdmin } from '@/utils/roles'
 
 const routes = [
   { path: '/login', component: () => import('@/views/login/index.vue') },
@@ -28,7 +28,7 @@ const routes = [
   },
   { path: '/redirect', redirect: () => {
     const role = localStorage.getItem('wr_roleCode')
-    return role === 'deptAdmin' ? '/admin/template-list' : '/org/task-list'
+    return isWreportAdmin(role) ? '/admin/template-list' : '/org/task-list'
   }},
   { path: '/:pathMatch(.*)*', redirect: '/login' }
 ]
@@ -38,11 +38,42 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
+// a 系统前端地址（context-path）；生产环境由 .env.production 注入
+const A_SYSTEM_URL = import.meta.env.VITE_A_SYSTEM_URL || 'http://localhost:18000/ylzlgl'
+
+/** hash 模式下 ticket 往往在 ?ticket= ，位于 # 前，需从 location.search 读取 */
+function getSearchParam(name) {
+  const params = new URLSearchParams(window.location.search)
+  return params.get(name)
+}
+
+router.beforeEach(async (to, _from, next) => {
   if (to.path === '/login') return next()
+
+  const ticket = getSearchParam('ticket') || to.query.ticket
+  if (ticket) {
+    try {
+      const apiBase = import.meta.env.VITE_API_PREFIX || ''
+      const res = await fetch(`${apiBase}/api/auth/sso-login?ticket=${encodeURIComponent(ticket)}`)
+      const json = await res.json()
+      if (json.code === 200 && json.data) {
+        const { useUserStore } = await import('@/store/user')
+        useUserStore().setUser(json.data)
+        const cleanUrl = window.location.origin + window.location.pathname + '#' + to.path
+        window.history.replaceState(null, '', cleanUrl)
+        return next({ path: to.path, replace: true })
+      }
+      return next('/login')
+    } catch {
+      return next('/login')
+    }
+  }
+
   const token = localStorage.getItem('wr_token')
-  if (!token) return next('/login')
-  next()
+  if (token) return next()
+
+  const callbackUrl = encodeURIComponent(window.location.origin + window.location.pathname)
+  window.location.href = `${A_SYSTEM_URL}/sso?redirectUrl=${callbackUrl}`
 })
 
 export default router

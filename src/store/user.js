@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { isWreportAdmin } from '@/utils/roles'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -11,7 +12,8 @@ export const useUserStore = defineStore('user', {
     roleCode: localStorage.getItem('wr_roleCode') || ''
   }),
   getters: {
-    isAdmin: state => state.roleCode === 'deptAdmin',
+    /** 主管部门管理员(superAdmin/deptAdmin)走管理端菜单，与后端 UserContext LoginUser.isAdmin 一致 */
+    isAdmin: state => isWreportAdmin(state.roleCode),
     isOrg:   state => ['qcUser', 'medicalUser'].includes(state.roleCode),
     isLoggedIn: state => !!state.token
   },
