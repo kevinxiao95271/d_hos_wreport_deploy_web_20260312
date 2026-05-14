@@ -22,7 +22,7 @@
       <!-- ══ 一级大类横幅 ══ -->
       <template v-if="mod.isLeaf === false && catHasLeafChildren(mod.moduleKey)">
         <div
-          :class="['cat-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
+          :class="['cat-banner', 'dw-level-1-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
           @click="toggleModule(mod.moduleKey)"
         >
           <div class="cat-banner-left">
@@ -39,9 +39,12 @@
         </div>
       </template>
 
-      <!-- ══ 二级叶子模块卡片 ══ -->
-      <template v-else>
-      <div v-show="!mod.parentModuleKey || !isCollapsed(mod.parentModuleKey)" class="leaf-card-wrap">
+      <!-- ══ 二级叶子模块卡片（排除无子的孤儿大类） ══ -->
+      <template v-else-if="mod.isLeaf !== false">
+      <div
+        v-show="!mod.parentModuleKey || !isCollapsed(mod.parentModuleKey)"
+        :class="['leaf-card-wrap', mod.parentModuleKey ? 'dw-level-2-indent' : 'dw-level-0-leaf']"
+      >
       <el-card
         shadow="never"
         :class="['module-card', 'module-card--leaf', `module-card--${leafAccentKey(mod.moduleKey)}`]"
@@ -328,8 +331,8 @@ const enabledModules = computed(() => {
   const keys = detail.value.enabledModuleKeys
   if (Array.isArray(keys) && keys.length) {
     const set = new Set(keys)
-    // 大类节点（isLeaf=false）始终保留，叶子节点按 enabledModuleKeys 过滤
-    return all.filter(m => !m.isLeaf || set.has(m.moduleKey))
+    // 仅 isLeaf===false 为大类；勿用 !m.isLeaf，否则 isLeaf 缺失会被当成大类误留
+    return all.filter(m => m.isLeaf === false || set.has(m.moduleKey))
   }
   return all
 })
@@ -344,7 +347,9 @@ const isQuarterlyTask = computed(() => detail.value.statQuarter != null)
 
 /** 大类下是否有已启用的叶子模块（无子则隐藏大类横幅） */
 function catHasLeafChildren(catKey) {
-  return enabledModules.value.some(m => m.isLeaf !== false && m.parentModuleKey === catKey)
+  return enabledModules.value.some(
+    m => m.isLeaf === true && m.parentModuleKey === catKey
+  )
 }
 
 // 模块折叠状态
@@ -662,20 +667,24 @@ onMounted(loadAll)
 <style scoped>
 .dw-admin-view { max-width: 960px; margin: 0 auto; }
 /* ══════════════════════════════════════
-   一级大类横幅（浅色专业风格）
+   一级大类横幅（通栏 + 粗色带）
 ══════════════════════════════════════ */
+.dw-level-1-banner {
+  margin-left: 0;
+  margin-right: 0;
+}
 .cat-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 18px;
+  padding: 14px 18px 14px 16px;
   border-radius: 8px;
   margin-bottom: 10px;
   margin-top: 28px;
   cursor: pointer;
   user-select: none;
-  border-left: 5px solid;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+  border-left: 6px solid;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   transition: box-shadow 0.2s;
 }
 .cat-banner:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.10); }
@@ -690,7 +699,7 @@ onMounted(loadAll)
 .cat-banner-left  { display: flex; align-items: center; gap: 10px; }
 .cat-banner-right { display: flex; align-items: center; gap: 10px; }
 
-.cat-banner-name  { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+.cat-banner-name  { font-size: 16px; font-weight: 800; letter-spacing: 0.4px; }
 .cat-banner--blue   .cat-banner-name { color: #1565a8; }
 .cat-banner--teal   .cat-banner-name { color: #0b6b65; }
 .cat-banner--purple .cat-banner-name { color: #5b2d9e; }
@@ -698,7 +707,7 @@ onMounted(loadAll)
 .cat-banner--green  .cat-banner-name { color: #1d6b35; }
 .cat-banner--gold   .cat-banner-name { color: #7a5600; }
 
-.toggle-icon--cat { font-size: 16px; transition: transform 0.25s; }
+.toggle-icon--cat { font-size: 18px; transition: transform 0.25s; }
 .cat-banner--blue   .toggle-icon--cat { color: #2d8fdc; }
 .cat-banner--teal   .toggle-icon--cat { color: #1aa89d; }
 .cat-banner--purple .toggle-icon--cat { color: #9254de; }
@@ -790,12 +799,32 @@ onMounted(loadAll)
 .score-summary-cell--actual .score-summary-hint { color: #c0c4cc; }
 
 /* ══════════════════════════════════════
-   二级叶子模块卡片
+   二级叶子：左廊道 + 卡片头区分
 ══════════════════════════════════════ */
-.leaf-card-wrap { margin-bottom: 12px; margin-left: 12px; }
+.leaf-card-wrap.dw-level-2-indent {
+  margin-left: 0;
+  margin-bottom: 12px;
+  padding-left: 22px;
+  border-left: 3px solid #dcdfe6;
+}
+.leaf-card-wrap.dw-level-0-leaf {
+  margin-left: 0;
+  margin-bottom: 12px;
+}
 .module-card--leaf {
-  border-left-width: 4px !important;
+  border-left-width: 3px !important;
   border-left-style: solid !important;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.module-card--leaf :deep(.el-card__header) {
+  background: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+  border-bottom: 1px solid #e4e7ed;
+  padding: 10px 16px;
+}
+.module-card--leaf :deep(.el-card__body) {
+  background: #fff;
 }
 .module-card--blue   { border-left-color: #2d8fdc !important; }
 .module-card--teal   { border-left-color: #1aa89d !important; }
@@ -808,11 +837,11 @@ onMounted(loadAll)
 .bonus-type-label { font-size: 13px; font-weight: 600; color: #606266; margin: 0 0 10px; }
 .module-header-admin { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; user-select: none; }
 .module-header-left  { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-top: 4px; }
-.module-name-admin   { font-size: 14px; font-weight: 600; color: #303133; }
+.module-name-admin   { font-size: 13px; font-weight: 600; color: #606266; letter-spacing: 0.02em; }
 .module-meta         { display: flex; flex-direction: column; gap: 6px; min-width: 320px; max-width: 460px; }
 .toggle-icon {
-  font-size: 14px;
-  color: #909399;
+  font-size: 13px;
+  color: #a8abb2;
   transition: transform 0.25s;
   flex-shrink: 0;
 }

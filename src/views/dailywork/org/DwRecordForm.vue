@@ -24,7 +24,7 @@
       <!-- ══ 一级大类横幅 ══ -->
       <template v-if="mod.isLeaf === false && catHasLeafChildren(mod.moduleKey)">
         <div
-          :class="['cat-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
+          :class="['cat-banner', 'dw-level-1-banner', `cat-banner--${catColorKey(mod.moduleKey)}`]"
           @click="toggleModule(mod.moduleKey)"
         >
           <div class="cat-banner-left">
@@ -43,9 +43,12 @@
         <!-- 大类无内容体，子模块紧随其后 -->
       </template>
 
-      <!-- ══ 二级填报模块卡片 ══ -->
-      <template v-else>
-      <div v-show="!mod.parentModuleKey || !isCollapsed(mod.parentModuleKey)" class="leaf-card-wrap">
+      <!-- ══ 二级填报模块卡片（排除 isLeaf=false 且无子的孤儿大类节点） ══ -->
+      <template v-else-if="mod.isLeaf !== false">
+      <div
+        v-show="!mod.parentModuleKey || !isCollapsed(mod.parentModuleKey)"
+        :class="['leaf-card-wrap', mod.parentModuleKey ? 'dw-level-2-indent' : 'dw-level-0-leaf']"
+      >
       <el-card
         shadow="never"
         :class="['module-card', 'module-card--leaf', `module-card--${leafAccentKey(mod.moduleKey)}`]"
@@ -223,8 +226,8 @@ const enabledModules = computed(() => {
   const keys = detail.value.enabledModuleKeys
   if (Array.isArray(keys) && keys.length) {
     const set = new Set(keys)
-    // 大类节点（isLeaf=false）始终保留，叶子节点按 enabledModuleKeys 过滤
-    return all.filter(m => !m.isLeaf || set.has(m.moduleKey))
+    // 仅 isLeaf===false 为大类；勿用 !m.isLeaf，否则 isLeaf 缺失会被当成大类误留，导致空大类横幅
+    return all.filter(m => m.isLeaf === false || set.has(m.moduleKey))
   }
   return all
 })
@@ -237,7 +240,9 @@ const isQuarterlyTask = computed(() => detail.value.statQuarter != null)
 
 /** 大类下是否有已启用的叶子模块（无子则隐藏大类横幅） */
 function catHasLeafChildren(catKey) {
-  return enabledModules.value.some(m => m.isLeaf !== false && m.parentModuleKey === catKey)
+  return enabledModules.value.some(
+    m => m.isLeaf === true && m.parentModuleKey === catKey
+  )
 }
 
 const editable       = computed(() => detail.value.status === 0 || detail.value.status === 3)
@@ -380,23 +385,26 @@ onMounted(loadAll)
 .dw-form-page { max-width: 1200px; margin: 0 auto; }
 
 /* ══════════════════════════════════════
-   一级大类横幅（浅色专业风格）
+   一级大类横幅（通栏 + 粗色带，与二级明显区分）
 ══════════════════════════════════════ */
+.dw-level-1-banner {
+  margin-left: 0;
+  margin-right: 0;
+}
 .cat-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 18px;
+  padding: 14px 18px 14px 16px;
   border-radius: 8px;
   margin-bottom: 10px;
   margin-top: 28px;
   cursor: pointer;
   user-select: none;
-  border-left: 5px solid;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+  border-left: 6px solid;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   transition: box-shadow 0.2s, opacity 0.2s;
 }
-.cat-banner:first-child { margin-top: 0; }
 .cat-banner:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.10); }
 
 /* 浅色背景 + 左边框色 */
@@ -429,9 +437,9 @@ onMounted(loadAll)
   gap: 10px;
 }
 .cat-banner-name {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
 }
 .cat-banner-right {
   display: flex;
@@ -467,18 +475,38 @@ onMounted(loadAll)
 .cat-banner--gold   .cat-score-val { color: #7a5600; }
 
 .toggle-icon--cat {
-  font-size: 16px;
+  font-size: 18px;
   transition: transform 0.25s;
 }
 
 /* ══════════════════════════════════════
-   二级叶子模块卡片
+   二级叶子：左廊道对齐 + 卡片头与一级折叠区分
 ══════════════════════════════════════ */
-.leaf-card-wrap { margin-bottom: 10px; margin-left: 6px; }
+.leaf-card-wrap.dw-level-2-indent {
+  margin-left: 0;
+  margin-bottom: 12px;
+  padding-left: 22px;
+  border-left: 3px solid #dcdfe6;
+}
+.leaf-card-wrap.dw-level-0-leaf {
+  margin-left: 0;
+  margin-bottom: 12px;
+}
 .module-card { }
 .module-card--leaf {
-  border-left-width: 4px !important;
+  border-left-width: 3px !important;
   border-left-style: solid !important;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.module-card--leaf :deep(.el-card__header) {
+  background: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+  border-bottom: 1px solid #e4e7ed;
+  padding: 10px 16px;
+}
+.module-card--leaf :deep(.el-card__body) {
+  background: #fff;
 }
 /* 左侧竖条颜色 */
 .module-card--blue   { border-left-color: #2d8fdc !important; }
@@ -495,10 +523,10 @@ onMounted(loadAll)
   user-select: none;
 }
 .module-header-left { display: flex; align-items: center; gap: 6px; }
-.module-name { font-size: 14px; font-weight: 600; color: #303133; }
+.module-name { font-size: 13px; font-weight: 600; color: #606266; letter-spacing: 0.02em; }
 .toggle-icon {
-  font-size: 14px;
-  color: #909399;
+  font-size: 13px;
+  color: #a8abb2;
   transition: transform 0.25s;
 }
 .toggle-icon.is-collapsed { transform: rotate(-90deg); }
