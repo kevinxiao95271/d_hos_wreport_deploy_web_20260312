@@ -665,7 +665,7 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.dw-admin-view { max-width: 960px; margin: 0 auto; }
+.dw-admin-view { width: 100%; max-width: none; margin: 0; }
 /* ══════════════════════════════════════
    一级大类横幅（通栏 + 粗色带）
 ══════════════════════════════════════ */

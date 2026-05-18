@@ -382,7 +382,7 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.dw-form-page { max-width: 1200px; margin: 0 auto; }
+.dw-form-page { width: 100%; max-width: none; margin: 0; }
 
 /* ══════════════════════════════════════
    一级大类横幅（通栏 + 粗色带，与二级明显区分）
