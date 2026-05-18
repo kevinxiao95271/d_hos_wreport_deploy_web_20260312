@@ -6,8 +6,8 @@
     </div>
 
     <div v-loading="loading">
-      <el-row :gutter="16" v-if="taskList.length">
-        <el-col v-for="task in taskList" :key="task.id" :xs="24" :sm="12" :lg="8" style="margin-bottom:16px">
+      <el-row :gutter="16" v-if="displayTaskList.length">
+        <el-col v-for="task in displayTaskList" :key="task.id" :xs="24" :sm="12" :lg="8" style="margin-bottom:16px">
           <el-card class="task-card" shadow="hover" @click="goForm(task)">
             <div class="task-header">
               <span class="task-name">{{ task.taskName }}</span>
@@ -30,7 +30,7 @@
             </div>
             <div class="task-footer">
               <el-button type="primary" size="small">
-                {{ recordStatusMap[task.id] ? '继续填报' : '开始填报' }}
+                {{ recordStatusMap[task.id] === 0 ? '继续填报' : '开始填报' }}
                 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
               </el-button>
             </div>
@@ -44,7 +44,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getActiveTasks } from '@/api/task'
 import { getMyRecord } from '@/api/record'
@@ -54,6 +54,12 @@ const router = useRouter()
 const loading = ref(false)
 const taskList = ref([])
 const recordStatusMap = ref({})
+const displayTaskList = computed(() =>
+  (taskList.value || []).filter(task => {
+    const status = recordStatusMap.value[task.id]
+    return status === 0 || status === undefined || status === null
+  })
+)
 
 onMounted(loadAll)
 

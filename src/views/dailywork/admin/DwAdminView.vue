@@ -950,6 +950,8 @@ onMounted(loadAll)
   overflow-x: hidden;
   border: 1px solid #ebeef5;
   border-radius: 4px;
+  /* 预留滚动条槽位，避免展开/折叠时因滚动条出现导致内容宽度抖动 */
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: #dcdfe6 transparent;
 }
@@ -957,6 +959,11 @@ onMounted(loadAll)
 .collapse-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
+
+/* 在固定高度滚动容器内禁用折叠高度动画，避免过渡抖动 */
+.collapse-scroll-wrap :deep(.el-collapse-item__wrap) {
+  transition: none !important;
+}
 
 .admin-collapse-title {
   display: inline-flex;

@@ -109,6 +109,12 @@ function goForm(row) {
   router.push({ path: '/org/report-form', query: { taskId: row.taskId, templateId } })
 }
 function goDetail(row) {
+  const taskInfo = taskInfoMap.value[row.taskId] || {}
+  const taskType = row.taskType || taskInfo.taskType
+  if (taskType === 'daily_work') {
+    router.push(`/dw/record/${row.taskId}`)
+    return
+  }
   router.push({ path: '/org/record-detail', query: { recordId: row.id } })
 }
 
