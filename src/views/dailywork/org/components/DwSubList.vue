@@ -826,6 +826,8 @@ async function handleDelete(item) {
   overflow-x: hidden;
   border: 1px solid #ebeef5;
   border-radius: 4px;
+  /* 预留滚动条槽位，避免展开/折叠时因滚动条出现导致内容宽度抖动 */
+  scrollbar-gutter: stable;
   /* 自定义滚动条（Webkit） */
   scrollbar-width: thin;
   scrollbar-color: #dcdfe6 transparent;
@@ -834,6 +836,11 @@ async function handleDelete(item) {
 .collapse-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
 .collapse-scroll-wrap::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
+
+/* 在固定高度滚动容器内禁用折叠过渡动画，避免高度计算抖动 */
+.collapse-scroll-wrap :deep(.el-collapse-item__wrap) {
+  transition: none !important;
+}
 
 /* 时间区间控件 */
 .time-range-group { display: flex; flex-direction: column; }

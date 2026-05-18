@@ -72,6 +72,7 @@ const list = ref([])
 const total = ref(0)
 const query = reactive({ pageNo: 1, pageSize: 10, status: null })
 const taskMap = ref({})
+const taskInfoMap = ref({})
 
 onMounted(() => { loadList(); loadTaskMap() })
 
@@ -89,11 +90,23 @@ async function loadList(page) {
 
 async function loadTaskMap() {
   const res = await getActiveTasks()
-  ;(res.data || []).forEach(t => { taskMap.value[t.id] = t.taskName })
+  ;(res.data || []).forEach(t => {
+    taskMap.value[t.id] = t.taskName
+    taskInfoMap.value[t.id] = t
+  })
 }
 
 function goForm(row) {
-  router.push({ path: '/org/report-form', query: { taskId: row.taskId, templateId: row.templateId } })
+  const taskInfo = taskInfoMap.value[row.taskId] || {}
+  const taskType = row.taskType || taskInfo.taskType
+  const templateId = row.templateId || taskInfo.templateId
+
+  if (taskType === 'daily_work') {
+    router.push(`/dw/record/${row.taskId}`)
+    return
+  }
+
+  router.push({ path: '/org/report-form', query: { taskId: row.taskId, templateId } })
 }
 function goDetail(row) {
   router.push({ path: '/org/record-detail', query: { recordId: row.id } })
