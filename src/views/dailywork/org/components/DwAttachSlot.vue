@@ -107,9 +107,10 @@ async function handleDelete(file) {
 <style scoped>
 .attach-slot { margin-bottom: 8px; }
 .slot-label  { font-size: 13px; color: #606266; margin-bottom: 6px; font-weight: 500; }
-.file-list   { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.file-list   { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; min-width: 0; }
 .file-chip {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   background: #f4f4f5;
@@ -117,12 +118,21 @@ async function handleDelete(file) {
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 13px;
-  max-width: 380px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 .chip-icon   { color: #909399; flex-shrink: 0; }
 .chip-name   { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip-actions { display: flex; gap: 2px; flex-shrink: 0; }
-.slot-upload-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.chip-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.slot-upload-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
 .slot-upload :deep(.el-upload) { display: inline-flex; }
 .format-hint { font-size: 11px; color: #909399; }
 .upload-progress {

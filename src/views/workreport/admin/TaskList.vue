@@ -142,7 +142,7 @@
             placement="right"
           >
             <el-checkbox :value="u.orgId" :disabled="isOrgLocked(u)">
-              {{ u.orgName || u.account }}（{{ u.account }}）
+              {{ u.orgName || '-' }}
               <el-tag v-if="isOrgLocked(u)" size="small" type="warning" style="margin-left:4px">已提交</el-tag>
             </el-checkbox>
           </el-tooltip>

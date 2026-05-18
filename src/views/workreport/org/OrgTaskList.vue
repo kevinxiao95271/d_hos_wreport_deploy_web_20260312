@@ -8,7 +8,12 @@
     <div v-loading="loading">
       <el-row :gutter="16" v-if="displayTaskList.length">
         <el-col v-for="task in displayTaskList" :key="task.id" :xs="24" :sm="12" :lg="8" style="margin-bottom:16px">
-          <el-card class="task-card" shadow="hover" @click="goForm(task)">
+          <el-card
+            class="task-card"
+            :class="{ 'task-card--disabled': isTaskExpired(task) }"
+            shadow="hover"
+            @click="handleCardClick(task)"
+          >
             <div class="task-header">
               <span class="task-name">{{ task.taskName }}</span>
               <el-tag :type="getRecordStatusType(recordStatusMap[task.id])" size="small">
@@ -29,7 +34,7 @@
               </div>
             </div>
             <div class="task-footer">
-              <el-button type="primary" size="small">
+              <el-button type="primary" size="small" :disabled="isTaskExpired(task)">
                 {{ recordStatusMap[task.id] === 0 ? '继续填报' : '开始填报' }}
                 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
               </el-button>
@@ -85,6 +90,15 @@ function getDaysLeft(deadline) {
   return dayjs(deadline).diff(dayjs(), 'day')
 }
 
+function isTaskExpired(task) {
+  return !!(task?.deadline && dayjs().isAfter(dayjs(task.deadline)))
+}
+
+function handleCardClick(task) {
+  if (isTaskExpired(task)) return
+  goForm(task)
+}
+
 function goForm(task) {
   if (task.taskType === 'daily_work') {
     router.push(`/dw/record/${task.id}`)
@@ -103,6 +117,8 @@ const getRecordStatusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: '
 .sub-title { margin: 0; color: #666; font-size: 13px; }
 .task-card { cursor: pointer; transition: transform .2s; }
 .task-card:hover { transform: translateY(-2px); }
+.task-card--disabled { cursor: not-allowed; opacity: .72; }
+.task-card--disabled:hover { transform: none; }
 .task-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
 .task-name { font-size: 15px; font-weight: 600; color: #1a3a5c; flex: 1; padding-right: 8px; }
 .task-meta { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #666; margin-bottom: 16px; }

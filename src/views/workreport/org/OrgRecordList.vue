@@ -36,6 +36,7 @@
             <el-button
               v-if="row.status === 0 || row.status === 3"
               type="primary" text size="small"
+              :disabled="isRecordContinueExpired(row)"
               @click="goForm(row)"
             >继续填报</el-button>
             <el-button
@@ -65,6 +66,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMyRecordPage } from '@/api/record'
 import { getActiveTasks } from '@/api/task'
+import dayjs from 'dayjs'
 
 const router = useRouter()
 const loading = ref(false)
@@ -97,6 +99,7 @@ async function loadTaskMap() {
 }
 
 function goForm(row) {
+  if (isRecordContinueExpired(row)) return
   const taskInfo = taskInfoMap.value[row.taskId] || {}
   const taskType = row.taskType || taskInfo.taskType
   const templateId = row.templateId || taskInfo.templateId
@@ -108,6 +111,22 @@ function goForm(row) {
 
   router.push({ path: '/org/report-form', query: { taskId: row.taskId, templateId } })
 }
+
+function isExpiredTime(deadline) {
+  return !!(deadline && dayjs().isAfter(dayjs(deadline)))
+}
+
+function getContinueDeadline(row) {
+  if (row.status === 3 && row.resubmitDeadline) return row.resubmitDeadline
+  if (row.deadline) return row.deadline
+  const taskInfo = taskInfoMap.value[row.taskId] || {}
+  return taskInfo.deadline
+}
+
+function isRecordContinueExpired(row) {
+  return isExpiredTime(getContinueDeadline(row))
+}
+
 function goDetail(row) {
   const taskInfo = taskInfoMap.value[row.taskId] || {}
   const taskType = row.taskType || taskInfo.taskType

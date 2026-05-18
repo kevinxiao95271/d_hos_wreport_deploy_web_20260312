@@ -12,19 +12,39 @@ export const getCrossView       = params => request.get('/wr/record/admin/crossv
 export const getCharCount       = recordId => request.get(`/wr/record/charcount/${recordId}`)
 export const getRecordScore     = recordId => request.get(`/wr/record/score/${recordId}`)
 
-export const exportRecord       = taskId => {
-  return request.get(`/wr/record/export/${taskId}`, { responseType: 'blob' })
-    .then(response => {
-      const url = URL.createObjectURL(new Blob([response]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `上报数据_${taskId}.xlsx`
-      a.click()
-      URL.revokeObjectURL(url)
-    })
-    .catch(() => {
-      // fallback: open in new tab
-      const token = localStorage.getItem('wr_token')
-      window.open(`/wr/record/export/${taskId}?token=${encodeURIComponent(token)}`)
-    })
+export const exportRecord = async (taskId, taskName) => {
+  const token = localStorage.getItem('wr_token') || ''
+  const baseURL = import.meta.env.VITE_API_PREFIX || ''
+  const url = `${baseURL}/wr/record/export/${encodeURIComponent(taskId)}`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: token
+    }
+  })
+
+  if (!res.ok) {
+    let msg = '导出失败'
+    try {
+      const err = await res.json()
+      msg = err?.message || err?.msg || msg
+    } catch {
+      // ignore json parse errors
+    }
+    throw new Error(msg)
+  }
+
+  const blob = await res.blob()
+  const safeTaskName = String(taskName || `任务_${taskId}`).replace(/[\\/:*?"<>|]/g, '_').trim()
+  const fileName = `${safeTaskName || `任务_${taskId}`}_上报数据.xlsx`
+
+  const downloadUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = downloadUrl
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(downloadUrl)
 }

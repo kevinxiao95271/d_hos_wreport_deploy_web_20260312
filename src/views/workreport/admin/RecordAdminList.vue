@@ -139,7 +139,12 @@ async function loadStats() {
 
 async function handleExport() {
   exporting.value = true
-  try { await exportRecord(selectedTaskId.value) } finally { exporting.value = false }
+  try {
+    const task = taskList.value.find(t => t.id === selectedTaskId.value)
+    await exportRecord(selectedTaskId.value, task?.taskName)
+  } finally {
+    exporting.value = false
+  }
 }
 
 function goDetail(row) {
