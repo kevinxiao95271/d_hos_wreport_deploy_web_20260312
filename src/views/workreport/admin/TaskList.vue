@@ -124,30 +124,83 @@
     </el-drawer>
 
     <!-- 分配机构对话框 -->
-    <el-dialog v-model="scopeVisible" title="分配上报机构" width="500px">
-      <!-- 全选控制行 -->
-      <div class="scope-select-all">
-        <el-checkbox
-          v-model="allChecked"
-          :indeterminate="isIndeterminate"
-          @change="toggleAll"
-        >全选（{{ selectedOrgIds.length }}/{{ userList.length }}）</el-checkbox>
-      </div>
-      <el-divider style="margin:8px 0" />
-      <el-checkbox-group v-model="selectedOrgIds" class="scope-list">
-        <div v-for="u in userList" :key="u.userId" class="scope-item">
-          <el-tooltip
-            :content="isOrgLocked(u) ? '请先驳回后再移出' : ''"
-            :disabled="!isOrgLocked(u)"
-            placement="right"
-          >
-            <el-checkbox :value="u.orgId" :disabled="isOrgLocked(u)">
-              {{ u.orgName || '-' }}
-              <el-tag v-if="isOrgLocked(u)" size="small" type="warning" style="margin-left:4px">已提交</el-tag>
-            </el-checkbox>
-          </el-tooltip>
+    <el-dialog
+      v-model="scopeVisible"
+      :title="scopeTaskName ? `分配上报机构 · ${scopeTaskName}` : '分配上报机构'"
+      width="780px"
+      top="6vh"
+      class="scope-dialog"
+      destroy-on-close
+    >
+      <div class="scope-dialog-body">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          title="未勾选任何机构并保存时，表示全部机构均可填报"
+          style="margin-bottom: 14px"
+        />
+
+        <div class="scope-assigned">
+          <div class="scope-assigned-head">
+            <span class="scope-section-title">已分配机构</span>
+            <span class="scope-section-count">{{ selectedOrgPreview.length }} 家</span>
+          </div>
+          <div v-if="selectedOrgPreview.length" class="assigned-org-tags">
+            <el-tag
+              v-for="o in selectedOrgPreview"
+              :key="o.orgId"
+              size="small"
+              type="info"
+              effect="plain"
+              class="assigned-org-tag"
+            >
+              {{ o.orgName || '-' }}
+            </el-tag>
+          </div>
+          <div v-else class="assigned-org-empty">暂未分配，保存后将视为全部机构可填报</div>
         </div>
-      </el-checkbox-group>
+
+        <div class="scope-section">
+          <div class="scope-section-head">
+            <span class="scope-section-title">选择机构</span>
+            <span class="scope-section-count">可选 {{ filteredUsers.length }} 家</span>
+          </div>
+          <el-input
+            v-model="scopeKeyword"
+            placeholder="搜索机构名称"
+            clearable
+            class="scope-search"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <div class="scope-select-all">
+            <el-checkbox
+              v-model="allChecked"
+              :indeterminate="isIndeterminate"
+              @change="toggleAll"
+            >全选当前列表（{{ selectedInFilteredCount }}/{{ filteredFreeUsers.length }}）</el-checkbox>
+          </div>
+          <el-divider style="margin: 8px 0" />
+          <el-checkbox-group v-model="selectedOrgIds" class="scope-list">
+            <div v-for="u in filteredUsers" :key="u.userId" class="scope-item">
+              <el-tooltip
+                :content="isOrgLocked(u) ? '请先驳回后再移出' : ''"
+                :disabled="!isOrgLocked(u)"
+                placement="right"
+              >
+                <el-checkbox :value="u.orgId" :disabled="isOrgLocked(u)">
+                  {{ u.orgName || '-' }}
+                  <el-tag v-if="isOrgLocked(u)" size="small" type="warning" style="margin-left: 4px">已提交</el-tag>
+                </el-checkbox>
+              </el-tooltip>
+            </div>
+          </el-checkbox-group>
+          <el-empty v-if="!filteredUsers.length" description="未找到匹配的机构" :image-size="56" />
+        </div>
+      </div>
       <template #footer>
         <el-button @click="scopeVisible = false">取消</el-button>
         <el-button type="primary" :loading="scopeSaving" @click="saveScope">保存</el-button>
@@ -203,26 +256,51 @@ const templateMap = computed(() => {
 const scopeVisible      = ref(false)
 const scopeSaving       = ref(false)
 const scopeTaskId       = ref(null)
+const scopeTaskName     = ref('')
 const selectedOrgIds    = ref([])
 const userList          = ref([])
+const scopeKeyword      = ref('')
 // orgId(string) -> recordStatus，用于判断是否锁定
 const scopeOrgStatusMap = ref({})
 
+const filteredUsers = computed(() => {
+  const kw = scopeKeyword.value.trim().toLowerCase()
+  if (!kw) return userList.value
+  return userList.value.filter(u => (u.orgName || '').toLowerCase().includes(kw))
+})
+
+const selectedOrgPreview = computed(() => {
+  const idSet = new Set((selectedOrgIds.value || []).map(id => String(id)))
+  return userList.value
+    .filter(u => idSet.has(String(u.orgId)))
+    .map(u => ({ orgId: u.orgId, orgName: u.orgName }))
+})
+
 // 未锁定的机构（recordStatus < 1 或 null）
-const freeUsers = computed(() =>
-  userList.value.filter(u => !isOrgLocked(u))
+const filteredFreeUsers = computed(() =>
+  filteredUsers.value.filter(u => !isOrgLocked(u))
+)
+const selectedInFilteredCount = computed(() =>
+  filteredFreeUsers.value.filter(u => selectedOrgIds.value.includes(u.orgId)).length
 )
 const allChecked = computed(() =>
-  freeUsers.value.length > 0 && freeUsers.value.every(u => selectedOrgIds.value.includes(u.orgId))
+  filteredFreeUsers.value.length > 0 &&
+  filteredFreeUsers.value.every(u => selectedOrgIds.value.includes(u.orgId))
 )
 const isIndeterminate = computed(() =>
-  freeUsers.value.some(u => selectedOrgIds.value.includes(u.orgId)) && !allChecked.value
+  selectedInFilteredCount.value > 0 && !allChecked.value
 )
 function toggleAll(val) {
   const lockedIds = userList.value.filter(isOrgLocked).map(u => u.orgId)
-  selectedOrgIds.value = val
-    ? [...new Set([...lockedIds, ...freeUsers.value.map(u => u.orgId)])]
-    : lockedIds
+  const filteredIds = filteredFreeUsers.value.map(u => u.orgId)
+  const selectedSet = new Set(selectedOrgIds.value)
+  if (val) {
+    filteredIds.forEach(id => selectedSet.add(id))
+  } else {
+    filteredIds.forEach(id => selectedSet.delete(id))
+  }
+  lockedIds.forEach(id => selectedSet.add(id))
+  selectedOrgIds.value = [...selectedSet]
 }
 function isOrgLocked(u) {
   const status = scopeOrgStatusMap.value[String(u.orgId)]
@@ -322,19 +400,18 @@ async function handleDelete(row) {
 
 async function openScopeDialog(row) {
   scopeTaskId.value = row.id
-  // 懒加载：仅在打开弹窗时才拉取用户列表（避免每次挂载都触发慢查询）
+  scopeTaskName.value = row.taskName || ''
+  scopeKeyword.value = ''
   if (!userList.value.length) {
     const res = await getUsers()
     userList.value = (res.data || []).filter(u => u.account !== 'wr_admin' && !u.account.startsWith('test'))
   }
   const res = await getTaskScope(row.id)
-  // 构建 orgId -> recordStatus 映射，用于禁用已有记录的机构
   const orgsWithStatus = res.data?.orgs || []
   const statusMap = {}
   orgsWithStatus.forEach(o => { statusMap[String(o.orgId)] = o.recordStatus })
   scopeOrgStatusMap.value = statusMap
-  // 当前已分配的 orgIds（与 userList 中 userId 对应）
-  selectedOrgIds.value = res.data?.orgIds || []
+  selectedOrgIds.value = [...(res.data?.orgIds || [])]
   scopeVisible.value = true
 }
 
@@ -349,13 +426,89 @@ async function saveScope() {
 
 const statusLabel = s => ({ 0: '草稿', 1: '进行中', 2: '已结束' }[s] ?? s)
 const statusType  = s => ({ 0: 'info', 1: 'success', 2: 'danger' }[s] ?? 'info')
+const recordStatusLabel = s => {
+  if (s == null) return '未开始'
+  return ({ 0: '草稿', 1: '已提交', 2: '已审核', 3: '已驳回' }[s] ?? s)
+}
+const recordStatusType = s => {
+  if (s == null) return 'info'
+  return ({ 0: '', 1: 'warning', 2: 'success', 3: 'danger' }[s] ?? 'info')
+}
 </script>
 
 <style scoped>
 .search-card :deep(.el-card__body) { padding: 16px 20px 0; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .pagination { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+.scope-dialog-body {
+  max-height: 72vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scope-assigned {
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f5f7fa 100%);
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+.scope-assigned-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.scope-section {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.scope-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.scope-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.scope-section-count {
+  font-size: 12px;
+  color: #909399;
+}
+.assigned-org-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 84px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.assigned-org-tag {
+  max-width: 100%;
+}
+.assigned-org-tag :deep(.el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assigned-org-empty {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+.scope-search { margin-bottom: 10px; }
 .scope-select-all { padding: 2px 0 4px; }
-.scope-list { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; }
-.scope-item { padding: 5px 0; }
+.scope-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.scope-item { padding: 6px 0; }
 </style>
