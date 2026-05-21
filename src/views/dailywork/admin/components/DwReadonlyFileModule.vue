@@ -39,8 +39,6 @@ const SLOT_MAP = {
   admin_response:    { type: 'single', field: 'adminResponseFiles' },
   indicator_db:      { type: 'single', field: 'indicatorDbFiles' },
   indicator_monitor: { type: 'single', field: 'indicatorMonitorFiles' },
-  national_report:   { type: 'single', field: 'nationalReportFiles' },
-  prov_report:       { type: 'single', field: 'provReportFiles' },
   network_build:     { type: 'nested', recordKey: 'networkBuild', nestedField: 'evidences' },
   work_plan:         { type: 'multi', recordKey: 'workPlanFiles',       slots: [{ slot: 'plan', field: 'plan', label: '年度计划' }, { slot: 'summary', field: 'summary', label: '年度总结' }] },
   activity_report:   { type: 'multi', recordKey: 'activityReportFiles', slots: [{ slot: 'pre_report', field: 'pre_report', label: '事前截图' }, { slot: 'post_report', field: 'post_report', label: '事后截图' }] },

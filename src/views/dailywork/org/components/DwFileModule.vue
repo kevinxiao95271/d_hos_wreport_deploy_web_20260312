@@ -86,14 +86,12 @@ const SLOT_MAP = {
   admin_response:     { type: 'single', slot: 'evidence', field: 'adminResponseFiles',     extraKey: 'adminResponseExtra',     ...FMT.pdfDocx },
   indicator_db:       { type: 'single', slot: 'evidence', field: 'indicatorDbFiles',       extraKey: 'indicatorDbExtra',       ...FMT.pdfDocx },
   indicator_monitor:  { type: 'single', slot: 'evidence', field: 'indicatorMonitorFiles',  extraKey: 'indicatorMonitorExtra',  ...FMT.pdfDocx },
-  national_report:    { type: 'single', slot: 'evidence', field: 'nationalReportFiles',    extraKey: 'nationalReportExtra',    ...FMT.pdfDocx },
-  prov_report:        { type: 'single', slot: 'evidence', field: 'provReportFiles',        extraKey: 'provReportExtra',        ...FMT.pdfDocx },
   work_plan: {
     type: 'multi',
     recordKey: 'workPlanFiles',
     slots: [
-      { slot: 'plan',    field: 'plan',    label: '年度工作计划（须加盖公章）', ...FMT.pdfDocx },
-      { slot: 'summary', field: 'summary', label: '年度工作总结（须加盖公章）', ...FMT.pdfDocx },
+      { slot: 'plan',    field: 'plan',    label: '年度工作计划（word上传，注意格式）', accept: '.pdf,.docx,.doc' },
+      { slot: 'summary', field: 'summary', label: '年度工作总结（word上传，注意格式）', accept: '.pdf,.docx,.doc' },
     ],
     extraKey: 'workPlanExtra',
   },
@@ -110,8 +108,8 @@ const SLOT_MAP = {
     type: 'multi',
     recordKey: 'bonusAdminFiles',
     slots: [
-      { slot: 'national_task', field: 'national_task', label: '国家工作任务证明材料', ...FMT.pdfDocx },
-      { slot: 'prov_task',     field: 'prov_task',     label: '浙江省工作任务证明材料', ...FMT.pdfDocx },
+      { slot: 'national_task', field: 'national_task', label: '国家工作任务证明材料', accept: '.pdf,.docx,.doc', hint: '支持 PDF / DOCX' },
+      { slot: 'prov_task',     field: 'prov_task',     label: '浙江省工作任务证明材料', accept: '.pdf,.docx,.doc', hint: '支持 PDF / DOCX' },
     ],
     extraKey: 'bonusAdminExtra',
   },

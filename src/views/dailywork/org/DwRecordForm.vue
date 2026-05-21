@@ -165,7 +165,20 @@
           />
         </template>
 
-        <!-- ⑤ 纯上传模块（含 bonus_admin 双槽） -->
+        <!-- ⑤ 国家/省报告：近3年勾选 + 按年上传 -->
+        <template v-else-if="isYearReportModule(mod.moduleKey)">
+          <DwYearReportModule
+            :module-key="mod.moduleKey"
+            :module-config="mod"
+            :record="detail"
+            :record-id="detail.recordId"
+            :editable="editable"
+            @uploaded="reloadDetail"
+            @deleted="reloadDetail"
+          />
+        </template>
+
+        <!-- ⑥ 纯上传模块（含 bonus_admin 双槽） -->
         <template v-else>
           <DwFileModule
             :module-key="mod.moduleKey"
@@ -202,11 +215,13 @@ import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, initDwRecord, submitDwRecord, saveDwFieldValues } from '@/api/dailywork'
 import { sortDwSubRecordsByStartDesc } from '@/utils/dwQuarter'
+import { DW_ANNUAL_MODULES, DW_QUARTER_MODULES, DW_ANNUAL_EXCLUDED_MODULES } from '@/utils/dwTaskModules'
 import DwSubList          from './components/DwSubList.vue'
 import DwBonusList        from './components/DwBonusList.vue'
 import DwFundingForm      from './components/DwFundingForm.vue'
-import DwFileModule       from './components/DwFileModule.vue'
-import DwNetworkBuildForm from './components/DwNetworkBuildForm.vue'
+import DwFileModule        from './components/DwFileModule.vue'
+import DwNetworkBuildForm  from './components/DwNetworkBuildForm.vue'
+import DwYearReportModule  from './components/DwYearReportModule.vue'
 
 const route      = useRoute()
 const taskId     = route.params.taskId
@@ -224,8 +239,15 @@ const DETAIL_KEY   = { meeting: 'meetings', training: 'trainings', guidance: 'gu
 const enabledModules = computed(() => {
   const all = (modules.value || []).filter(m => m.isEnabled)
   const keys = detail.value.enabledModuleKeys
-  if (Array.isArray(keys) && keys.length) {
+    if (Array.isArray(keys) && keys.length) {
     const set = new Set(keys)
+    if (detail.value.taskType === 'daily_work') {
+      const extras = detail.value.statQuarter == null ? DW_ANNUAL_MODULES : DW_QUARTER_MODULES
+      extras.forEach(k => set.add(k))
+      if (detail.value.statQuarter == null) {
+        DW_ANNUAL_EXCLUDED_MODULES.forEach(k => set.delete(k))
+      }
+    }
     // 仅 isLeaf===false 为大类；勿用 !m.isLeaf，否则 isLeaf 缺失会被当成大类误留，导致空大类横幅
     return all.filter(m => m.isLeaf === false || set.has(m.moduleKey))
   }
@@ -286,6 +308,7 @@ function isBonusModule(key) {
   return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp'
 }
 function isNetworkBuildModule(key) { return key === 'network_build' }
+function isYearReportModule(key) { return key === 'national_report' || key === 'prov_report' }
 
 function getListItems(key) {
   // 年度自填条目：按开始时间倒序

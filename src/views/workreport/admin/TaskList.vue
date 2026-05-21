@@ -163,13 +163,7 @@ import { getTaskPage, addTask, updateTask, deleteTask, updateTaskStatus, getTask
 import { setDwTaskModules } from '@/api/dailywork'
 import { getTemplateList } from '@/api/template'
 import { getUsers } from '@/api/auth'
-
-const DW_QUARTER_MODULES = ['meeting', 'training', 'guidance', 'survey']
-const DW_ALL_MODULES = [
-  'meeting', 'training', 'guidance', 'survey',
-  'annual_work', 'it_construction', 'work_plan', 'admin_response',
-  'activity_report', 'funding', 'bonus_pub', 'bonus_comp'
-]
+import { DW_QUARTER_MODULES, DW_ANNUAL_MODULES } from '@/utils/dwTaskModules'
 
 const loading = ref(false)
 const list = ref([])
@@ -303,7 +297,7 @@ async function handleSubmit() {
     }
     // 日常工作任务：自动设置模块范围
     if (form.taskType === 'daily_work' && taskId) {
-      const moduleKeys = form.dwPeriod === 'annual' ? DW_ALL_MODULES : DW_QUARTER_MODULES
+      const moduleKeys = form.dwPeriod === 'annual' ? DW_ANNUAL_MODULES : DW_QUARTER_MODULES
       await setDwTaskModules(taskId, moduleKeys).catch(() => {})
     }
     drawerVisible.value = false

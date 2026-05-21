@@ -92,11 +92,6 @@
                             <template #default="{ row: r }">{{ FORM_LABEL[r.surveyForm] || r.surveyForm }}</template>
                           </el-table-column>
                         </template>
-
-                        <template v-else-if="mk === 'data_analysis_report'">
-                          <el-table-column prop="reportName" label="报告名称" min-width="140" show-overflow-tooltip />
-                          <el-table-column prop="reportDate" label="报告日期" width="110" />
-                        </template>
                       </el-table>
                     </template>
                     <div v-else class="qref-empty">暂无记录</div>
@@ -167,14 +162,13 @@ const props = defineProps({
   orgId:    { type: String, default: null },
 })
 
-const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey', 'data_analysis_report']
-const ALL_ORDERED  = ['meeting', 'training', 'guidance', 'survey', 'data_analysis_report',
+const LIST_MODULES = ['meeting', 'training', 'guidance', 'survey']
+const ALL_ORDERED  = ['meeting', 'training', 'guidance', 'survey',
   'annual_work', 'it_construction', 'work_plan', 'admin_response',
   'activity_report', 'funding', 'bonus_pub', 'bonus_comp']
 
 const MOD_NAMES = {
   meeting: '质控会议', training: '质控培训', guidance: '质控指导', survey: '质控调研',
-  data_analysis_report: '数据分析报告',
   annual_work: '年度工作落实', it_construction: '信息化建设', work_plan: '工作计划总结',
   admin_response: '行政指令响应', activity_report: '质控活动报备', funding: '经费执行',
   bonus_pub: '加分项-丛书/指南', bonus_comp: '加分项-技能竞赛',

@@ -238,6 +238,15 @@
           </el-descriptions>
         </template>
 
+        <!-- 国家/省报告 -->
+        <template v-else-if="isYearReportModule(mod.moduleKey)">
+          <DwReadonlyYearReportModule
+            :module-key="mod.moduleKey"
+            :record="detail"
+            @preview="(u,n) => previewRef.show(u,n)"
+          />
+        </template>
+
         <!-- 纯上传模块 -->
         <template v-else>
           <DwReadonlyFileModule :module-key="mod.moduleKey" :record="detail" @preview="(u,n) => previewRef.show(u,n)" />
@@ -310,10 +319,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
 import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
+import { DW_ANNUAL_MODULES, DW_QUARTER_MODULES, DW_ANNUAL_EXCLUDED_MODULES } from '@/utils/dwTaskModules'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
 import DwReadonlyBonuses     from './components/DwReadonlyBonuses.vue'
-import DwReadonlyFileModule  from './components/DwReadonlyFileModule.vue'
+import DwReadonlyFileModule       from './components/DwReadonlyFileModule.vue'
+import DwReadonlyYearReportModule from './components/DwReadonlyYearReportModule.vue'
 
 const route    = useRoute()
 const recordId = route.query.recordId
@@ -331,6 +342,13 @@ const enabledModules = computed(() => {
   const keys = detail.value.enabledModuleKeys
   if (Array.isArray(keys) && keys.length) {
     const set = new Set(keys)
+    if (detail.value.taskType === 'daily_work') {
+      const extras = detail.value.statQuarter == null ? DW_ANNUAL_MODULES : DW_QUARTER_MODULES
+      extras.forEach(k => set.add(k))
+      if (detail.value.statQuarter == null) {
+        DW_ANNUAL_EXCLUDED_MODULES.forEach(k => set.delete(k))
+      }
+    }
     // 仅 isLeaf===false 为大类；勿用 !m.isLeaf，否则 isLeaf 缺失会被当成大类误留
     return all.filter(m => m.isLeaf === false || set.has(m.moduleKey))
   }
@@ -490,6 +508,7 @@ function leafAccentKey(key) { return LEAF_ACCENT_MAP[key] || 'blue' }
 
 function isListModule(key) { return LIST_MODULES.includes(key) }
 function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || key === 'bonus_comp' }
+function isYearReportModule(key) { return key === 'national_report' || key === 'prov_report' }
 
 function getListItems(key) {
   // 年度自填条目：按开始时间倒序
