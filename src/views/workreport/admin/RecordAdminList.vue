@@ -14,9 +14,6 @@
           </el-select>
         </el-form-item>
         <el-form-item v-if="selectedTaskId">
-          <el-checkbox v-model="onlyPendingRejectApply">仅看待处理撤回申请</el-checkbox>
-        </el-form-item>
-        <el-form-item v-if="selectedTaskId">
           <el-button type="success" @click="handleExport" :loading="exporting">
             <el-icon><Download /></el-icon> 导出 Excel
           </el-button>
@@ -28,7 +25,12 @@
       <!-- 状态统计卡 -->
       <el-row :gutter="12" style="margin-top:12px">
         <el-col :span="4" v-for="item in statCards" :key="item.key">
-          <el-card shadow="never" class="stat-card" :class="item.class">
+          <el-card
+            shadow="never"
+            class="stat-card"
+            :class="[item.class, { 'stat-card--active': isStatActive(item.key) }]"
+            @click="onStatCardClick(item.key)"
+          >
             <div class="stat-num">{{ stats[item.key] ?? 0 }}</div>
             <div class="stat-label">{{ item.label }}</div>
           </el-card>
@@ -40,11 +42,17 @@
         <template #header>
           <div class="card-header">
             <span>机构提交情况</span>
-            <el-input v-model="orgFilter" placeholder="按机构名筛选" clearable style="width:200px" />
+            <el-input
+              v-model="orgFilter"
+              placeholder="按机构名筛选"
+              clearable
+              style="width:200px"
+              @change="onOrgFilterChange"
+            />
           </div>
         </template>
 
-        <el-table :data="filteredList" border stripe v-loading="loading">
+        <el-table :data="list" border stripe v-loading="loading">
           <el-table-column prop="orgName" label="机构名称" min-width="180">
             <template #default="{ row }">{{ row.orgName || `机构ID: ${row.orgId}` }}</template>
           </el-table-column>
@@ -126,7 +134,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
@@ -143,7 +151,7 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
 const orgFilter = ref('')
-const onlyPendingRejectApply = ref(false)
+const statusFilter = ref(null)
 const stats = ref({})
 const handleVisible = ref(false)
 const handleSaving = ref(false)
@@ -159,16 +167,68 @@ const statCards = [
   { key: 'pendingRejectApply', label: '待处理撤回', class: 'card-pending-apply' }
 ]
 
-const filteredList = computed(() => {
-  let rows = list.value
-  if (onlyPendingRejectApply.value) {
-    rows = rows.filter(r => r.rejectApplyStatus === 1)
+const STATUS_FILTER_MAP = {
+  draft: 0,
+  submitted: 1,
+  approved: 2,
+  rejected: 3,
+}
+
+function isStatActive(key) {
+  if (key === 'total') return !statusFilter.value
+  return statusFilter.value === key
+}
+
+function onStatCardClick(key) {
+  if (key === 'total') {
+    statusFilter.value = null
+  } else if (statusFilter.value === key) {
+    statusFilter.value = null
+  } else {
+    statusFilter.value = key
   }
-  if (orgFilter.value) {
-    rows = rows.filter(r => (r.orgName || '').includes(orgFilter.value))
+  pageNo.value = 1
+  loadRecords()
+}
+
+function onOrgFilterChange() {
+  pageNo.value = 1
+  loadRecords()
+}
+
+function buildRecordQueryParams() {
+  const params = {
+    taskId: selectedTaskId.value,
+    pageNum: pageNo.value,
+    pageSize: pageSize.value,
   }
-  return rows
-})
+  if (orgFilter.value?.trim()) {
+    params.orgName = orgFilter.value.trim()
+  }
+  if (statusFilter.value === 'pendingRejectApply') {
+    params.rejectApplyStatus = 1
+  } else if (statusFilter.value && STATUS_FILTER_MAP[statusFilter.value] != null) {
+    params.status = STATUS_FILTER_MAP[statusFilter.value]
+  }
+  return params
+}
+
+async function onTaskChange() {
+  pageNo.value = 1
+  statusFilter.value = null
+  orgFilter.value = ''
+  await Promise.all([loadRecords(), loadStats()])
+}
+
+async function loadRecords() {
+  if (!selectedTaskId.value) return
+  loading.value = true
+  try {
+    const res = await getAdminRecordPage(buildRecordQueryParams())
+    list.value = res.data.records
+    total.value = Number(res.data.total)
+  } finally { loading.value = false }
+}
 
 function defaultDeadline() {
   return dayjs().add(7, 'day').format('YYYY-MM-DD HH:mm:ss')
@@ -179,21 +239,6 @@ onMounted(loadTaskList)
 async function loadTaskList() {
   const res = await getTaskPage({ pageNo: 1, pageSize: 100 })
   taskList.value = res.data.records || []
-}
-
-async function onTaskChange() {
-  pageNo.value = 1
-  await Promise.all([loadRecords(), loadStats()])
-}
-
-async function loadRecords() {
-  if (!selectedTaskId.value) return
-  loading.value = true
-  try {
-    const res = await getAdminRecordPage({ taskId: selectedTaskId.value, pageNo: pageNo.value, pageSize: pageSize.value })
-    list.value = res.data.records
-    total.value = Number(res.data.total)
-  } finally { loading.value = false }
 }
 
 async function loadStats() {
@@ -267,7 +312,13 @@ const recordStatusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'dan
 
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
-.stat-card { text-align: center; cursor: default; }
+.stat-card { text-align: center; cursor: pointer; transition: box-shadow 0.2s, transform 0.15s; }
+.stat-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.stat-card--active {
+  box-shadow: 0 0 0 2px #409eff inset;
+  transform: translateY(-1px);
+}
+.stat-card--active .stat-label { color: #409eff; font-weight: 600; }
 .stat-num { font-size: 28px; font-weight: 700; line-height: 1.2; }
 .stat-label { font-size: 13px; color: #666; margin-top: 4px; }
 .card-total :deep(.el-card__body) { background: #f0f9ff; }

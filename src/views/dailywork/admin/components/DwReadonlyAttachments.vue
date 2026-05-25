@@ -10,7 +10,7 @@
             <span class="chip-name" :title="f.fileName">{{ f.fileName }}</span>
             <div class="chip-actions">
               <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
-              <el-button type="primary" link size="small" tag="a" :href="f.fileUrl" target="_blank">下载</el-button>
+              <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
             </div>
           </div>
         </div>
@@ -23,6 +23,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Document } from '@element-plus/icons-vue'
+import { downloadDwAttachment } from '@/utils/dwFileDownload'
 
 const props = defineProps({
   item:      { type: Object, required: true },
@@ -47,6 +48,7 @@ const PDF_EXTS   = ['pdf']
 const DOCX_EXTS  = ['docx','doc']
 function ext(name) { return (name || '').split('.').pop().toLowerCase() }
 function canPreview(name) { const e = ext(name); return IMAGE_EXTS.includes(e) || PDF_EXTS.includes(e) || DOCX_EXTS.includes(e) }
+function downloadFile(file) { downloadDwAttachment(file.id, file.fileName) }
 </script>
 
 <style scoped>

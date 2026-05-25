@@ -52,6 +52,10 @@ export function uploadDwAttachment(recordId, moduleType, slot, file, subRecordId
 }
 export const deleteDwAttachment = (id) => request.post(`/dw/record/attachment/delete/${id}`)
 
+/** 下载附件 URL（供 fetch 当页下载） */
+export const getDwAttachmentDownloadUrl = (id) =>
+  `${import.meta.env.VITE_API_PREFIX || ''}/dw/record/attachment/download/${id}`
+
 export const getGuidanceRegions = () => request.get('/dw/config/guidance/regions')
 
 // 模块评分（管理员）

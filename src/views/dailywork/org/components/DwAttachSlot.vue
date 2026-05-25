@@ -18,7 +18,7 @@
           >预览</el-button>
           <el-button
             type="primary" link size="small"
-            tag="a" :href="file.fileUrl" target="_blank"
+            @click="downloadFile(file)"
           >下载</el-button>
           <el-button
             v-if="editable"
@@ -52,6 +52,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Document, UploadFilled, Loading } from '@element-plus/icons-vue'
 import { uploadDwAttachment, deleteDwAttachment } from '@/api/dailywork'
+import { downloadDwAttachment } from '@/utils/dwFileDownload'
 
 const props = defineProps({
   files:       { type: Array,   default: () => [] },
@@ -101,6 +102,10 @@ async function handleDelete(file) {
   } finally {
     deletingId.value = null
   }
+}
+
+function downloadFile(file) {
+  downloadDwAttachment(file.id, file.fileName)
 }
 </script>
 

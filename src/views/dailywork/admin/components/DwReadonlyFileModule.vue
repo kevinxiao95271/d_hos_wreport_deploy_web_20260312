@@ -6,7 +6,7 @@
           <el-icon><Document /></el-icon>
           <span class="chip-name">{{ f.fileName }}</span>
           <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
-          <el-button type="primary" link size="small" tag="a" :href="f.fileUrl" target="_blank">下载</el-button>
+          <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
         </div>
         <span v-if="!getFiles(singleSlot.field).length" style="color:#c0c4cc;font-size:13px">暂无文件</span>
       </div>
@@ -19,7 +19,7 @@
             <el-icon><Document /></el-icon>
             <span class="chip-name">{{ f.fileName }}</span>
             <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
-            <el-button type="primary" link size="small" tag="a" :href="f.fileUrl" target="_blank">下载</el-button>
+            <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
           </div>
           <span v-if="!getFiles(s.field).length" style="color:#c0c4cc;font-size:13px">暂无文件</span>
         </div>
@@ -31,6 +31,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Document } from '@element-plus/icons-vue'
+import { downloadDwAttachment } from '@/utils/dwFileDownload'
 const props = defineProps({ moduleKey: String, record: Object })
 defineEmits(['preview'])
 const SLOT_MAP = {
@@ -57,6 +58,7 @@ function getFiles(field) {
 const IMAGE_EXTS=['jpg','jpeg','png','gif','webp'], PDF_EXTS=['pdf'], DOCX_EXTS=['docx','doc']
 function ext(n){return(n||'').split('.').pop().toLowerCase()}
 function canPreview(n){const e=ext(n);return IMAGE_EXTS.includes(e)||PDF_EXTS.includes(e)||DOCX_EXTS.includes(e)}
+function downloadFile(file) { downloadDwAttachment(file.id, file.fileName) }
 </script>
 <style scoped>
 .slot-label{font-size:12px;color:#909399;margin-bottom:4px}

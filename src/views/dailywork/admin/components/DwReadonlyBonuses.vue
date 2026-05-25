@@ -18,7 +18,7 @@
             <el-icon><Document /></el-icon>
             <span class="chip-name">{{ f.fileName }}</span>
             <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
-            <el-button type="primary" link size="small" tag="a" :href="f.fileUrl" target="_blank">下载</el-button>
+            <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
           </div>
           <span v-if="!item.evidences?.length" style="color:#c0c4cc;font-size:13px">无</span>
         </div>
@@ -29,11 +29,13 @@
 
 <script setup>
 import { Document } from '@element-plus/icons-vue'
+import { downloadDwAttachment } from '@/utils/dwFileDownload'
 defineProps({ items: { type: Array, default: () => [] } })
 defineEmits(['preview'])
 const IMAGE_EXTS = ['jpg','jpeg','png','gif','webp'], PDF_EXTS = ['pdf'], DOCX_EXTS = ['docx','doc']
 function ext(n) { return (n||'').split('.').pop().toLowerCase() }
 function canPreview(n) { const e=ext(n); return IMAGE_EXTS.includes(e)||PDF_EXTS.includes(e)||DOCX_EXTS.includes(e) }
+function downloadFile(file) { downloadDwAttachment(file.id, file.fileName) }
 const pubCategoryLabel  = v => ({ book_guide_consensus: '专著/指南/共识', standard_norm: '标准/规范' }[v] ?? v ?? '—')
 const compSponsorLabel  = v => ({ provincial_joint: '省级联合主办', other: '其他' }[v] ?? v ?? '—')
 const halfLabel = h => h === 'AM' ? '上午' : h === 'PM' ? '下午' : ''
