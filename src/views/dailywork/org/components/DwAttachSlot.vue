@@ -105,9 +105,9 @@ async function handleDelete(file) {
 </script>
 
 <style scoped>
-.attach-slot { margin-bottom: 8px; }
+.attach-slot { margin-bottom: 8px; min-width: 0; max-width: 100%; }
 .slot-label  { font-size: 13px; color: #606266; margin-bottom: 6px; font-weight: 500; }
-.file-list   { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; min-width: 0; }
+.file-list   { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; min-width: 0; max-width: 100%; }
 .file-chip {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -124,7 +124,12 @@ async function handleDelete(file) {
   min-width: 0;
 }
 .chip-icon   { color: #909399; flex-shrink: 0; }
-.chip-name   { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-name   {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .chip-actions {
   display: inline-flex;
   align-items: center;

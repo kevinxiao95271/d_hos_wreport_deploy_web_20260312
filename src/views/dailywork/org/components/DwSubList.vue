@@ -212,12 +212,10 @@
               <div class="attach-slot-label">{{ s.label }}</div>
               <div class="attach-slot-fmt">{{ s.hint }}</div>
               <div v-if="pendingFiles[s.slot]?.length" class="pending-chips">
-                <el-tag
-                  v-for="(f, idx) in pendingFiles[s.slot]"
-                  :key="idx" closable size="small"
-                  style="margin:2px 4px 2px 0"
-                  @close="removePending(s.slot, idx)"
-                >{{ f.name }}</el-tag>
+                <DwPendingFileList
+                  :files="pendingFiles[s.slot]"
+                  @remove="(idx) => removePending(s.slot, idx)"
+                />
               </div>
               <el-upload
                 :accept="s.accept" :show-file-list="false"
@@ -348,7 +346,8 @@ import {
   uploadDwAttachment,
   getGuidanceRegions,
 } from '@/api/dailywork'
-import DwAttachSlot  from './DwAttachSlot.vue'
+import DwAttachSlot       from './DwAttachSlot.vue'
+import DwPendingFileList  from './DwPendingFileList.vue'
 import DwExtraFields from './DwExtraFields.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import { dwQuarterRowStyle } from '@/utils/dwQuarter'
@@ -407,7 +406,7 @@ const FIXED_FIELDS = {
     { key: 'trainingStartDate', label: '时间区间',  type: 'timeRange',
       startDateKey: 'trainingStartDate', startHalfKey: 'trainingStartHalf',
       endDateKey:   'trainingEndDate',   endHalfKey:   'trainingEndHalf' },
-    { key: 'trainingForm',      label: '培训形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }] },
+    { key: 'trainingForm',      label: '培训形式',  type: 'select',  options: [{ label: '线下', value: 'offline' }, { label: '线上', value: 'online' }, { label: '线上+线下', value: 'hybrid' }] },
     { key: 'trainingPeopleCount', label: '培训人数', type: 'number', placeholder: '人' },
     { key: 'trainingContent',   label: '培训内容',  type: 'text',    placeholder: '简要描述' },
   ],
@@ -594,7 +593,7 @@ function initBlankForm() {
   editingItem.value = null
 }
 
-watch(() => props.items, (newItems) => {
+watch(() => props.items, (newItems, oldItems) => {
   if (pendingOpenId.value) {
     const match = newItems.find(i => String(i.id) === String(pendingOpenId.value))
     if (match) {
@@ -604,7 +603,8 @@ watch(() => props.items, (newItems) => {
   }
   const idSet = new Set(newItems.map(i => String(i.id)))
   openIds.value = openIds.value.filter(id => idSet.has(String(id)))
-  if (newItems.length === 0) initBlankForm()
+  // 仅当服务端列表从「有记录」变为「无记录」时重置内联表单；避免父组件重渲染时新数组引用误清空未保存内容
+  if (newItems.length === 0 && oldItems?.length > 0) initBlankForm()
 }, { deep: false })
 
 onMounted(async () => {
@@ -787,6 +787,9 @@ async function handleDelete(item) {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px; margin-top: 8px;
 }
+.attach-grid :deep(.attach-slot) {
+  min-width: 0;
+}
 
 /* 内联表单 */
 .inline-form-wrap {
@@ -814,6 +817,9 @@ async function handleDelete(item) {
 }
 .attach-inline-slot {
   background: #fff; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px 10px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .attach-slot-label { font-size: 13px; font-weight: 500; color: #303133; margin-bottom: 2px; }
 .attach-slot-fmt   { font-size: 11px; color: #909399; margin-bottom: 6px; }

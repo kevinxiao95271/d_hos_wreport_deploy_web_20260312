@@ -14,6 +14,9 @@
           </el-select>
         </el-form-item>
         <el-form-item v-if="selectedTaskId">
+          <el-checkbox v-model="onlyPendingRejectApply">仅看待处理撤回申请</el-checkbox>
+        </el-form-item>
+        <el-form-item v-if="selectedTaskId">
           <el-button type="success" @click="handleExport" :loading="exporting">
             <el-icon><Download /></el-icon> 导出 Excel
           </el-button>
@@ -42,7 +45,7 @@
         </template>
 
         <el-table :data="filteredList" border stripe v-loading="loading">
-          <el-table-column prop="orgName" label="机构名称" min-width="200">
+          <el-table-column prop="orgName" label="机构名称" min-width="180">
             <template #default="{ row }">{{ row.orgName || `机构ID: ${row.orgId}` }}</template>
           </el-table-column>
           <el-table-column prop="status" label="状态" width="110" align="center">
@@ -50,12 +53,26 @@
               <el-tag :type="recordStatusType(row.status)">{{ recordStatusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="撤回申请" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.rejectApplyStatus === 1" type="warning" size="small">待处理</el-tag>
+              <span v-else style="color:#c0c4cc">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="rejectApplyReason" label="申请原因" min-width="140" show-overflow-tooltip />
           <el-table-column prop="submitTime" label="提交时间" width="160" />
           <el-table-column prop="auditTime" label="审核时间" width="160" />
-          <el-table-column prop="auditRemark" label="审核意见" min-width="150" show-overflow-tooltip />
-          <el-table-column label="操作" width="80" align="center" fixed="right">
+          <el-table-column prop="auditRemark" label="审核意见" min-width="130" show-overflow-tooltip />
+          <el-table-column label="操作" width="180" align="center" fixed="right">
             <template #default="{ row }">
               <el-button type="primary" text size="small" @click="goDetail(row)">查看</el-button>
+              <el-button
+                v-if="row.rejectApplyStatus === 1"
+                type="danger"
+                text
+                size="small"
+                @click="openHandleReject(row)"
+              >同意撤回</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -73,14 +90,48 @@
     </template>
 
     <el-empty v-else description="请先选择一个任务" style="margin-top:40px" />
+
+    <el-dialog v-model="handleVisible" title="处理撤回申请" width="560px" destroy-on-close>
+      <el-descriptions v-if="handleRow" :column="1" border size="small" style="margin-bottom:12px">
+        <el-descriptions-item label="机构">{{ handleRow.orgName || handleRow.orgId }}</el-descriptions-item>
+        <el-descriptions-item label="申请原因">{{ handleRow.rejectApplyReason || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="申请时间">{{ handleRow.rejectApplyTime || '—' }}</el-descriptions-item>
+      </el-descriptions>
+      <el-form :model="handleForm" label-width="100px">
+        <el-form-item label="处理意见" required>
+          <el-input
+            v-model="handleForm.handleRemark"
+            type="textarea"
+            :rows="3"
+            placeholder="同意撤回时请填写处理意见"
+          />
+        </el-form-item>
+        <el-form-item label="重提截止">
+          <el-date-picker
+            v-model="handleForm.resubmitDeadline"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="不填则默认 7 天后"
+            style="width:240px"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="handleVisible = false">取消</el-button>
+        <el-button @click="submitHandleReject(false)">拒绝申请</el-button>
+        <el-button type="danger" :loading="handleSaving" @click="submitHandleReject(true)">同意撤回</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import dayjs from 'dayjs'
 import { getTaskPage } from '@/api/task'
-import { getAdminRecordPage, getAdminAggregate, exportRecord } from '@/api/record'
+import { getAdminRecordPage, getAdminAggregate, exportRecord, handleRejectApply } from '@/api/record'
 
 const router = useRouter()
 const taskList = ref([])
@@ -92,20 +143,36 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
 const orgFilter = ref('')
+const onlyPendingRejectApply = ref(false)
 const stats = ref({})
+const handleVisible = ref(false)
+const handleSaving = ref(false)
+const handleRow = ref(null)
+const handleForm = reactive({ handleRemark: '', resubmitDeadline: defaultDeadline() })
 
 const statCards = [
   { key: 'total',     label: '应报总数', class: 'card-total' },
   { key: 'draft',     label: '草稿',     class: 'card-draft' },
   { key: 'submitted', label: '待审核',   class: 'card-submitted' },
   { key: 'approved',  label: '审核通过', class: 'card-approved' },
-  { key: 'rejected',  label: '已驳回',   class: 'card-rejected' }
+  { key: 'rejected',  label: '已驳回',   class: 'card-rejected' },
+  { key: 'pendingRejectApply', label: '待处理撤回', class: 'card-pending-apply' }
 ]
 
 const filteredList = computed(() => {
-  if (!orgFilter.value) return list.value
-  return list.value.filter(r => (r.orgName || '').includes(orgFilter.value))
+  let rows = list.value
+  if (onlyPendingRejectApply.value) {
+    rows = rows.filter(r => r.rejectApplyStatus === 1)
+  }
+  if (orgFilter.value) {
+    rows = rows.filter(r => (r.orgName || '').includes(orgFilter.value))
+  }
+  return rows
 })
+
+function defaultDeadline() {
+  return dayjs().add(7, 'day').format('YYYY-MM-DD HH:mm:ss')
+}
 
 onMounted(loadTaskList)
 
@@ -156,6 +223,44 @@ function goDetail(row) {
   }
 }
 
+function openHandleReject(row) {
+  handleRow.value = row
+  handleForm.handleRemark = ''
+  handleForm.resubmitDeadline = defaultDeadline()
+  handleVisible.value = true
+}
+
+async function submitHandleReject(approved) {
+  const handleRemark = (handleForm.handleRemark || '').trim()
+  if (approved && !handleRemark) {
+    ElMessage.warning('同意撤回时请填写处理意见')
+    return
+  }
+  const actionText = approved ? '同意撤回' : '拒绝该申请'
+  try {
+    await ElMessageBox.confirm(`确认${actionText}？`, '确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  handleSaving.value = true
+  try {
+    const payload = {
+      recordId: handleRow.value.id,
+      approved,
+      handleRemark
+    }
+    if (approved && handleForm.resubmitDeadline) {
+      payload.resubmitDeadline = handleForm.resubmitDeadline
+    }
+    await handleRejectApply(payload)
+    ElMessage.success(approved ? '已同意撤回，机构可重新填报' : '已拒绝申请')
+    handleVisible.value = false
+    await Promise.all([loadRecords(), loadStats()])
+  } finally {
+    handleSaving.value = false
+  }
+}
+
 const recordStatusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '未提交')
 const recordStatusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }[s] ?? '')
 </script>
@@ -170,5 +275,6 @@ const recordStatusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'dan
 .card-submitted :deep(.el-card__body) { background: #fff7e6; }
 .card-approved :deep(.el-card__body) { background: #f6ffed; }
 .card-rejected :deep(.el-card__body) { background: #fff1f0; }
+.card-pending-apply :deep(.el-card__body) { background: #fff7e6; }
 .pagination { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>

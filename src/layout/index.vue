@@ -69,9 +69,7 @@
 
       <main class="layout-content">
         <router-view v-slot="{ Component }">
-          <keep-alive :include="cachedViews">
-            <component :is="Component" :key="$route.fullPath" />
-          </keep-alive>
+          <component :is="Component" :key="$route.fullPath" />
         </router-view>
       </main>
     </div>
@@ -90,7 +88,6 @@ const userStore = useUserStore()
 
 const activeMenu = computed(() => route.path)
 const currentTitle = computed(() => route.meta?.title || '')
-const cachedViews = ['TemplateList', 'TaskList', 'RecordAdminList', 'CrossView', 'OrgTaskList', 'OrgRecordList']
 
 async function handleLogout() {
   await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })

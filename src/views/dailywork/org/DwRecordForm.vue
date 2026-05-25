@@ -2,14 +2,24 @@
   <div class="dw-form-page" v-loading="pageLoading">
 
     <!-- 顶部信息栏 -->
-    <el-page-header @back="$router.back()" style="margin-bottom:16px">
+    <el-page-header @back="handleBack" style="margin-bottom:16px">
       <template #content>
         <span>{{ detail.taskName }}</span>
+        <el-tag v-if="isPreview" type="info" size="small" style="margin-left:10px">预览</el-tag>
         <el-tag :type="statusType(detail.status)" size="small" style="margin-left:10px">
           {{ statusLabel(detail.status) }}
         </el-tag>
       </template>
     </el-page-header>
+
+    <el-alert
+      v-if="isPreview"
+      type="info"
+      :closable="false"
+      show-icon
+      style="margin-bottom:16px"
+      title="当前为预览模式，所有模块仅可查看，不可编辑。"
+    />
 
     <!-- 驳回原因 -->
     <el-alert
@@ -200,18 +210,24 @@
     <!-- 提交栏 -->
     <div v-if="editable" class="submit-bar">
       <el-button size="large" @click="showDraftTip">保存草稿</el-button>
+      <el-button size="large" @click="goPreview">预览</el-button>
       <el-button type="primary" size="large" :loading="submitting" @click="handleSubmit">
         提交上报
       </el-button>
       <span class="submit-hint">各模块数据保存后自动留存，提交前可随时修改</span>
+    </div>
+
+    <div v-else-if="isPreview" class="submit-bar">
+      <el-button type="primary" size="large" @click="goEdit">返回编辑</el-button>
+      <span class="submit-hint">预览模式下不可修改，请返回编辑页继续填报</span>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, initDwRecord, submitDwRecord, saveDwFieldValues } from '@/api/dailywork'
 import { sortDwSubRecordsByStartDesc } from '@/utils/dwQuarter'
@@ -224,7 +240,9 @@ import DwNetworkBuildForm  from './components/DwNetworkBuildForm.vue'
 import DwYearReportModule  from './components/DwYearReportModule.vue'
 
 const route      = useRoute()
+const router     = useRouter()
 const taskId     = route.params.taskId
+const isPreview  = computed(() => route.name === 'DwRecordPreview' || route.meta.preview === true)
 const pageLoading = ref(true)
 const submitting  = ref(false)
 const modules     = ref([])
@@ -267,7 +285,7 @@ function catHasLeafChildren(catKey) {
   )
 }
 
-const editable       = computed(() => detail.value.status === 0 || detail.value.status === 3)
+const editable       = computed(() => !isPreview.value && (detail.value.status === 0 || detail.value.status === 3))
 
 // 模块折叠状态
 const collapsedKeys = ref(new Set())
@@ -385,17 +403,45 @@ async function saveModuleSelfScore(mod) {
 }
 
 async function handleSubmit() {
+  try {
+    await ElMessageBox.confirm(
+      '提交后将进入审核流程，审核期间不可修改填报内容；审核驳回后方可再次修改并重新提交。请确认各模块信息、附件均已填写完整后再提交。',
+      '确认提交上报',
+      {
+        type: 'warning',
+        confirmButtonText: '确认提交',
+        cancelButtonText: '再看看',
+      }
+    )
+  } catch {
+    return
+  }
+
   submitting.value = true
   try {
     await submitDwRecord(detail.value.recordId)
     ElMessage.success('提交成功，等待审核')
     await reloadDetail()
   } finally {
-    submitting.value = false }
+    submitting.value = false
+  }
 }
 
 function showDraftTip() {
   ElMessage({ message: '各模块数据已自动保存，提交前可随时修改', type: 'success', duration: 2500 })
+}
+
+function handleBack() {
+  if (isPreview.value) goEdit()
+  else router.back()
+}
+
+function goPreview() {
+  router.push({ name: 'DwRecordPreview', params: { taskId } })
+}
+
+function goEdit() {
+  router.push({ name: 'DwRecordForm', params: { taskId } })
 }
 
 const statusLabel = s => ({ 0: '草稿', 1: '已提交', 2: '已通过', 3: '已驳回' }[s] ?? '—')

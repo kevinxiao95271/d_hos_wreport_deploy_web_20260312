@@ -24,6 +24,7 @@ const routes = [
       { path: '/org/record-list',  name: 'OrgRecordList',  component: () => import('@/views/workreport/org/OrgRecordList.vue'),  meta: { title: '我的上报', role: 'org' } },
       { path: '/org/record-detail',name: 'OrgRecordDetail',component: () => import('@/views/workreport/org/OrgRecordDetail.vue'),meta: { title: '上报详情', role: 'org', hidden: true } },
       { path: '/dw/record/:taskId', name: 'DwRecordForm',  component: () => import('@/views/dailywork/org/DwRecordForm.vue'),   meta: { title: '日常工作填报', role: 'org', hidden: true } },
+      { path: '/dw/record/:taskId/preview', name: 'DwRecordPreview', component: () => import('@/views/dailywork/org/DwRecordForm.vue'), meta: { title: '日常工作预览', role: 'org', hidden: true, preview: true } },
     ]
   },
   { path: '/redirect', redirect: () => {

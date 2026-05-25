@@ -2,7 +2,7 @@
   <div>
     <div class="page-title">
       <h3>上报任务</h3>
-      <p class="sub-title">以下为当前进行中的上报任务，请在截止日期前完成填报</p>
+      <p class="sub-title">以下为当前可填报的上报任务，请在截止日期前完成填报</p>
     </div>
 
     <div v-loading="loading">
@@ -16,8 +16,8 @@
           >
             <div class="task-header">
               <span class="task-name">{{ task.taskName }}</span>
-              <el-tag :type="getRecordStatusType(recordStatusMap[task.id])" size="small">
-                {{ getRecordStatusLabel(recordStatusMap[task.id]) }}
+              <el-tag :type="getRecordStatusType(getRecordStatus(task.id))" size="small">
+                {{ getRecordStatusLabel(getRecordStatus(task.id)) }}
               </el-tag>
             </div>
             <div class="task-meta">
@@ -29,13 +29,16 @@
                 </el-tag>
                 <el-tag v-if="getDaysLeft(task.deadline) < 0" type="danger" size="small" style="margin-left:6px">已截止</el-tag>
               </div>
+              <div v-if="getRecordStatus(task.id) === 3 && recordMap[task.id]?.resubmitDeadline">
+                <el-icon><Clock /></el-icon> 重提截止：{{ recordMap[task.id].resubmitDeadline }}
+              </div>
               <div v-if="task.remark" class="task-remark">
                 <el-icon><InfoFilled /></el-icon> {{ task.remark }}
               </div>
             </div>
             <div class="task-footer">
               <el-button type="primary" size="small" :disabled="isTaskExpired(task)">
-                {{ recordStatusMap[task.id] === 0 ? '继续填报' : '开始填报' }}
+                {{ getActionLabel(task.id) }}
                 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
               </el-button>
             </div>
@@ -43,7 +46,7 @@
         </el-col>
       </el-row>
 
-      <el-empty v-else description="暂无进行中的上报任务" />
+      <el-empty v-else description="暂无可填报的上报任务" />
     </div>
   </div>
 </template>
@@ -58,27 +61,32 @@ import dayjs from 'dayjs'
 const router = useRouter()
 const loading = ref(false)
 const taskList = ref([])
-const recordStatusMap = ref({})
+const recordMap = ref({})
+
 const displayTaskList = computed(() =>
   (taskList.value || []).filter(task => {
-    const status = recordStatusMap.value[task.id]
-    return status === 0 || status === undefined || status === null
+    const status = getRecordStatus(task.id)
+    return status === 0 || status === 3 || status === undefined || status === null
   })
 )
 
 onMounted(loadAll)
+
+function getRecordStatus(taskId) {
+  return recordMap.value[taskId]?.status
+}
 
 async function loadAll() {
   loading.value = true
   try {
     const res = await getActiveTasks()
     taskList.value = res.data || []
-    // Load record status for each task
+    recordMap.value = {}
     await Promise.allSettled(
       taskList.value.map(async task => {
         try {
           const r = await getMyRecord(task.id)
-          if (r.data) recordStatusMap.value[task.id] = r.data.status
+          if (r.data) recordMap.value[task.id] = r.data
         } catch { /* no record yet */ }
       })
     )
@@ -90,8 +98,20 @@ function getDaysLeft(deadline) {
   return dayjs(deadline).diff(dayjs(), 'day')
 }
 
+function getContinueDeadline(task) {
+  const rec = recordMap.value[task.id]
+  if (rec?.status === 3 && rec.resubmitDeadline) return rec.resubmitDeadline
+  return task.deadline
+}
+
 function isTaskExpired(task) {
-  return !!(task?.deadline && dayjs().isAfter(dayjs(task.deadline)))
+  const deadline = getContinueDeadline(task)
+  return !!(deadline && dayjs().isAfter(dayjs(deadline)))
+}
+
+function getActionLabel(taskId) {
+  const status = getRecordStatus(taskId)
+  return (status === 0 || status === 3) ? '继续填报' : '开始填报'
 }
 
 function handleCardClick(task) {

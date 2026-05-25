@@ -127,9 +127,10 @@ function getFiles(field) {
 }
 
 watch(() => {
-  const cfg = slotConfig.value
-  return props.record[cfg.extraKey] || {}
-}, (v) => { extraLocal.value = { ...v } }, { immediate: true })
+  const key = slotConfig.value.extraKey
+  if (!key) return undefined
+  return props.record[key]
+}, (v) => { extraLocal.value = { ...(v || {}) } }, { immediate: true })
 
 async function saveExtra(vals) {
   if (!props.editable) return

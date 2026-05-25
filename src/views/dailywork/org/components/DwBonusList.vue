@@ -110,15 +110,11 @@
         </el-divider>
         <div class="attach-inline-slot">
           <div class="attach-slot-fmt">支持 PDF / DOCX</div>
-          <div v-if="pendingEvidence.length" style="margin-bottom:6px">
-            <el-tag
-              v-for="(f, idx) in pendingEvidence"
-              :key="idx"
-              closable size="small"
-              style="margin:2px 4px 2px 0"
-              @close="pendingEvidence.splice(idx, 1)"
-            >{{ f.name }}</el-tag>
-          </div>
+          <DwPendingFileList
+            v-if="pendingEvidence.length"
+            :files="pendingEvidence"
+            @remove="(idx) => pendingEvidence.splice(idx, 1)"
+          />
           <el-upload
             accept=".pdf,.docx,.doc"
             :show-file-list="false"
@@ -203,7 +199,8 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { saveBonus, deleteBonus, saveDwFieldValues, uploadDwAttachment } from '@/api/dailywork'
-import DwAttachSlot  from './DwAttachSlot.vue'
+import DwAttachSlot       from './DwAttachSlot.vue'
+import DwPendingFileList  from './DwPendingFileList.vue'
 import DwExtraFields from './DwExtraFields.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 
@@ -263,7 +260,7 @@ function initBlankForm() {
   editingItem.value = null
 }
 
-watch(() => props.items, (newItems) => {
+watch(() => props.items, (newItems, oldItems) => {
   if (pendingOpenId.value) {
     const match = newItems.find(i => String(i.id) === String(pendingOpenId.value))
     if (match) {
@@ -271,7 +268,7 @@ watch(() => props.items, (newItems) => {
       pendingOpenId.value = null
     }
   }
-  if (newItems.length === 0) initBlankForm()
+  if (newItems.length === 0 && oldItems?.length > 0) initBlankForm()
 }, { deep: false })
 
 onMounted(() => {
@@ -401,8 +398,9 @@ async function handleDelete(item) {
   border: 1px solid #ebeef5;
   border-radius: 4px;
   padding: 8px 10px;
-  display: inline-block;
-  min-width: 200px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .attach-slot-fmt { font-size: 11px; color: #909399; margin-bottom: 6px; }
 

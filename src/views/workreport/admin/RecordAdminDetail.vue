@@ -16,6 +16,11 @@
             </el-descriptions-item>
             <el-descriptions-item v-if="record.auditTime" label="审核时间">{{ record.auditTime }}</el-descriptions-item>
             <el-descriptions-item v-if="record.auditRemark" label="审核意见" :span="2">{{ record.auditRemark }}</el-descriptions-item>
+            <el-descriptions-item v-if="record.rejectApplyStatus === 1" label="撤回申请" :span="3">
+              <el-tag type="warning" size="small">待处理</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="record.rejectApplyReason" label="申请原因" :span="3">{{ record.rejectApplyReason }}</el-descriptions-item>
+            <el-descriptions-item v-if="record.rejectApplyTime" label="申请时间">{{ record.rejectApplyTime }}</el-descriptions-item>
             <el-descriptions-item v-if="record.resubmitDeadline" label="重提截止">{{ record.resubmitDeadline }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -179,6 +184,31 @@
           </el-table>
         </el-card>
 
+        <!-- 撤回申请处理 -->
+        <el-card v-if="(record.status === 1 || record.status === 2) && record.rejectApplyStatus === 1" shadow="never" style="margin-top:12px">
+          <template #header><span>撤回申请处理</span></template>
+          <el-form :model="rejectApplyForm" label-width="100px">
+            <el-form-item label="处理意见">
+              <el-input v-model="rejectApplyForm.handleRemark" type="textarea" :rows="3" placeholder="同意撤回时请填写处理意见" />
+            </el-form-item>
+            <el-form-item label="重提截止日期">
+              <el-date-picker
+                v-model="rejectApplyForm.resubmitDeadline"
+                type="datetime"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                placeholder="不填则默认 7 天后"
+                style="width:240px"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button :loading="rejectApplySaving" @click="doHandleRejectApply(false)">拒绝申请</el-button>
+              <el-button type="danger" :loading="rejectApplySaving" @click="doHandleRejectApply(true)">
+                <el-icon><Close /></el-icon> 同意撤回
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
         <!-- 审核操作栏（status=1 待审核时显示） -->
         <el-card v-if="record.status === 1" shadow="never" style="margin-top:12px">
           <template #header><span>审核操作</span></template>
@@ -215,7 +245,7 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, Download } from '@element-plus/icons-vue'
-import { getRecordDetail, auditRecord, getRecordScore } from '@/api/record'
+import { getRecordDetail, auditRecord, getRecordScore, handleRejectApply } from '@/api/record'
 import { getTemplateFullDetail } from '@/api/template'
 import { getAttachments } from '@/api/attachment'
 import DynamicHeaderTable from '@/components/DynamicHeaderTable.vue'
@@ -230,6 +260,7 @@ const recordId = route.query.recordId
 
 const loading  = ref(true)
 const auditing = ref(false)
+const rejectApplySaving = ref(false)
 const zipping  = ref(false)
 // 管理端实际得分 & 备注（key: itemId 或 'g_父节点名'，本地暂存，等后端接口就绪再同步）
 const adminScores  = reactive({})
@@ -334,6 +365,7 @@ function defaultDeadline() {
 }
 
 const auditForm = reactive({ auditResult: 1, auditRemark: '', resubmitDeadline: defaultDeadline() })
+const rejectApplyForm = reactive({ handleRemark: '', resubmitDeadline: defaultDeadline() })
 
 const isMatrix = computed(() =>
   getLeafNodesFromTree(templateItems.value).some(i => i.valueType === 'checkbox')
@@ -443,6 +475,28 @@ async function doAudit(result) {
     ElMessage.success(result === 1 ? '已通过' : '已驳回')
     loadAll()
   } finally { auditing.value = false }
+}
+
+async function doHandleRejectApply(approved) {
+  const handleRemark = (rejectApplyForm.handleRemark || '').trim()
+  if (approved && !handleRemark) {
+    ElMessage.warning('同意撤回时请填写处理意见')
+    return
+  }
+  const actionText = approved ? '同意撤回' : '拒绝该申请'
+  try {
+    await ElMessageBox.confirm(`确认${actionText}？`, '确认', { type: 'warning' })
+  } catch { return }
+  rejectApplySaving.value = true
+  try {
+    const payload = { recordId, approved, handleRemark }
+    if (approved && rejectApplyForm.resubmitDeadline) {
+      payload.resubmitDeadline = rejectApplyForm.resubmitDeadline
+    }
+    await handleRejectApply(payload)
+    ElMessage.success(approved ? '已同意撤回，机构可重新填报' : '已拒绝申请')
+    loadAll()
+  } finally { rejectApplySaving.value = false }
 }
 
 const statusLabel = s => ({ 0: '草稿', 1: '待审核', 2: '已通过', 3: '已驳回' }[s] ?? '—')

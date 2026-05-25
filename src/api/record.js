@@ -8,6 +8,8 @@ export const getRecordDetail    = id     => request.get(`/wr/record/detail/${id}
 export const saveRecord         = data   => request.post('/wr/record/save', data)
 export const submitRecord       = data   => request.post('/wr/record/submit', data)
 export const auditRecord        = data   => request.post('/wr/record/audit', data)
+export const applyRejectRecord  = data   => request.post('/wr/record/reject-apply', data)
+export const handleRejectApply  = data   => request.post('/wr/record/reject-apply/handle', data)
 export const getCrossView       = params => request.get('/wr/record/admin/crossview', { params })
 export const getCharCount       = recordId => request.get(`/wr/record/charcount/${recordId}`)
 export const getRecordScore     = recordId => request.get(`/wr/record/score/${recordId}`)

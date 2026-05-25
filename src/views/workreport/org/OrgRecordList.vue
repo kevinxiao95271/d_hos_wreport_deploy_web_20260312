@@ -24,14 +24,16 @@
           <template #default="{ row }">{{ taskMap[row.taskId] || `任务:${row.taskId}` }}</template>
         </el-table-column>
         <el-table-column prop="submitTime" label="提交时间" width="160" />
-        <el-table-column prop="status" label="状态" width="110" align="center">
+        <el-table-column prop="status" label="状态" width="130" align="center">
           <template #default="{ row }">
             <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag v-if="row.rejectApplyStatus === 1" type="warning" size="small" style="margin-left:4px">申请撤回中</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="rejectApplyReason" label="申请原因" min-width="140" show-overflow-tooltip />
         <el-table-column prop="auditRemark" label="审核意见" min-width="150" show-overflow-tooltip />
         <el-table-column prop="resubmitDeadline" label="重提截止" width="160" />
-        <el-table-column label="操作" width="130" align="center" fixed="right">
+        <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
               v-if="row.status === 0 || row.status === 3"
@@ -44,6 +46,11 @@
               type="primary" text size="small"
               @click="goDetail(row)"
             >查看详情</el-button>
+            <el-button
+              v-if="canApplyReject(row)"
+              type="warning" text size="small"
+              @click="openApplyReject(row)"
+            >申请撤回</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -58,13 +65,33 @@
         />
       </div>
     </el-card>
+
+    <el-dialog v-model="applyVisible" title="申请撤回" width="520px" destroy-on-close>
+      <el-form :model="applyForm" label-width="88px">
+        <el-form-item label="申请原因" required>
+          <el-input
+            v-model="applyForm.reason"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="请说明需要重新修改的原因"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="applyVisible = false">取消</el-button>
+        <el-button type="primary" :loading="applySaving" @click="submitApplyReject">提交申请</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyRecordPage } from '@/api/record'
+import { ElMessage } from 'element-plus'
+import { getMyRecordPage, applyRejectRecord } from '@/api/record'
 import { getActiveTasks } from '@/api/task'
 import dayjs from 'dayjs'
 
@@ -75,6 +102,9 @@ const total = ref(0)
 const query = reactive({ pageNo: 1, pageSize: 10, status: null })
 const taskMap = ref({})
 const taskInfoMap = ref({})
+const applyVisible = ref(false)
+const applySaving = ref(false)
+const applyForm = reactive({ recordId: null, reason: '' })
 
 onMounted(() => { loadList(); loadTaskMap() })
 
@@ -96,6 +126,34 @@ async function loadTaskMap() {
     taskMap.value[t.id] = t.taskName
     taskInfoMap.value[t.id] = t
   })
+}
+
+function canApplyReject(row) {
+  if (row.status !== 1 && row.status !== 2) return false
+  return (row.rejectApplyStatus || 0) !== 1
+}
+
+function openApplyReject(row) {
+  applyForm.recordId = row.id
+  applyForm.reason = ''
+  applyVisible.value = true
+}
+
+async function submitApplyReject() {
+  const reason = (applyForm.reason || '').trim()
+  if (!reason) {
+    ElMessage.warning('请填写申请原因')
+    return
+  }
+  applySaving.value = true
+  try {
+    await applyRejectRecord({ recordId: applyForm.recordId, reason })
+    ElMessage.success('撤回申请已提交，请等待管理员处理')
+    applyVisible.value = false
+    loadList()
+  } finally {
+    applySaving.value = false
+  }
 }
 
 function goForm(row) {
