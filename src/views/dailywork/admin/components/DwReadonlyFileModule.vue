@@ -5,7 +5,7 @@
         <div v-for="f in getFiles(singleSlot.field)" :key="f.id" class="file-chip">
           <el-icon><Document /></el-icon>
           <span class="chip-name">{{ f.fileName }}</span>
-          <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
+          <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName, f.id)">预览</el-button>
           <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
         </div>
         <span v-if="!getFiles(singleSlot.field).length" style="color:#c0c4cc;font-size:13px">暂无文件</span>
@@ -18,7 +18,7 @@
           <div v-for="f in getFiles(s.field)" :key="f.id" class="file-chip">
             <el-icon><Document /></el-icon>
             <span class="chip-name">{{ f.fileName }}</span>
-            <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
+            <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName, f.id)">预览</el-button>
             <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
           </div>
           <span v-if="!getFiles(s.field).length" style="color:#c0c4cc;font-size:13px">暂无文件</span>
@@ -41,7 +41,7 @@ const SLOT_MAP = {
   indicator_db:      { type: 'single', field: 'indicatorDbFiles' },
   indicator_monitor: { type: 'single', field: 'indicatorMonitorFiles' },
   network_build:     { type: 'nested', recordKey: 'networkBuild', nestedField: 'evidences' },
-  work_plan:         { type: 'multi', recordKey: 'workPlanFiles',       slots: [{ slot: 'plan', field: 'plan', label: '年度计划' }, { slot: 'summary', field: 'summary', label: '年度总结' }] },
+  work_plan:         { type: 'multi', recordKey: 'workPlanFiles',       slots: [{ slot: 'plan', field: 'plan', label: '工作指引' }, { slot: 'summary', field: 'summary', label: '年度总结' }] },
   activity_report:   { type: 'multi', recordKey: 'activityReportFiles', slots: [{ slot: 'pre_report', field: 'pre_report', label: '事前截图' }, { slot: 'post_report', field: 'post_report', label: '事后截图' }] },
   bonus_admin:       { type: 'multi', recordKey: 'bonusAdminFiles',     slots: [{ slot: 'national_task', field: 'national_task', label: '国家工作任务' }, { slot: 'prov_task', field: 'prov_task', label: '浙江省工作任务' }] },
 }

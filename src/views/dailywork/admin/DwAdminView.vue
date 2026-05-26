@@ -169,7 +169,7 @@
               </template>
               <!-- 附件 -->
               <el-divider content-position="left" style="margin:10px 0 6px">附件</el-divider>
-              <DwReadonlyAttachments :item="item" :module-key="mod.moduleKey" @preview="(u,n) => previewRef.show(u,n)" />
+              <DwReadonlyAttachments :item="item" :module-key="mod.moduleKey" @preview="(u,n,id) => previewRef.show(u,n,id)" />
             </el-collapse-item>
           </el-collapse>
           </div>
@@ -206,7 +206,7 @@
               </el-descriptions-item>
             </el-descriptions>
             <el-divider content-position="left" style="margin:12px 0 6px">证明材料</el-divider>
-            <DwReadonlyFileModule module-key="network_build" :record="detail" @preview="(u,n) => previewRef.show(u,n)" />
+            <DwReadonlyFileModule module-key="network_build" :record="detail" @preview="(u,n,id) => previewRef.show(u,n,id)" />
           </template>
           <el-empty v-else description="机构未填写网络完善信息" :image-size="50" />
         </template>
@@ -216,14 +216,14 @@
           <template v-if="mod.moduleKey !== 'bonus_comp'">
             <div>
               <p v-if="mod.moduleKey === 'bonus'" class="bonus-type-label">丛书 / 指南 / 共识出版</p>
-              <DwReadonlyBonuses :items="getBonusItems('publication')" @preview="(u,n) => previewRef.show(u,n)" />
+              <DwReadonlyBonuses :items="getBonusItems('publication')" @preview="(u,n,id) => previewRef.show(u,n,id)" />
             </div>
           </template>
           <el-divider v-if="mod.moduleKey === 'bonus'" style="margin:12px 0" />
           <template v-if="mod.moduleKey !== 'bonus_pub'">
             <div>
               <p v-if="mod.moduleKey === 'bonus'" class="bonus-type-label">竞赛组织与主办</p>
-              <DwReadonlyBonuses :items="getBonusItems('competition')" @preview="(u,n) => previewRef.show(u,n)" />
+              <DwReadonlyBonuses :items="getBonusItems('competition')" @preview="(u,n,id) => previewRef.show(u,n,id)" />
             </div>
           </template>
         </template>
@@ -243,13 +243,13 @@
           <DwReadonlyYearReportModule
             :module-key="mod.moduleKey"
             :record="detail"
-            @preview="(u,n) => previewRef.show(u,n)"
+            @preview="(u,n,id) => previewRef.show(u,n,id)"
           />
         </template>
 
         <!-- 纯上传模块 -->
         <template v-else>
-          <DwReadonlyFileModule :module-key="mod.moduleKey" :record="detail" @preview="(u,n) => previewRef.show(u,n)" />
+          <DwReadonlyFileModule :module-key="mod.moduleKey" :record="detail" @preview="(u,n,id) => previewRef.show(u,n,id)" />
         </template>
 
         </div><!-- /v-show collapse body -->

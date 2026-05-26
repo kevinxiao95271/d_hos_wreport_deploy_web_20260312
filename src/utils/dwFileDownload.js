@@ -29,6 +29,31 @@ function triggerBlobDownload(blob, fileName) {
   URL.revokeObjectURL(url)
 }
 
+/** 按 URL 当页下载，优先使用 Content-Disposition，否则使用传入文件名 */
+export async function downloadFileByUrl(url, fileName) {
+  if (!url) {
+    ElMessage.warning('文件地址不存在')
+    return
+  }
+
+  let res
+  try {
+    res = await fetch(url)
+  } catch (e) {
+    ElMessage.error(e.message || '下载失败')
+    return
+  }
+
+  if (!res.ok) {
+    ElMessage.error('下载失败')
+    return
+  }
+
+  const blob = await res.blob()
+  const name = parseFileNameFromDisposition(res.headers.get('Content-Disposition')) || fileName
+  triggerBlobDownload(blob, name)
+}
+
 /** 日常工作附件：走后端代理下载，保留原始文件名，不新开页面 */
 export async function downloadDwAttachment(attachmentId, fileName) {
   if (!attachmentId) {

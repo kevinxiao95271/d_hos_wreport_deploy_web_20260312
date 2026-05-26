@@ -24,7 +24,7 @@
           :label="`${year}年证明材料`"
           @uploaded="$emit('uploaded')"
           @deleted="$emit('deleted')"
-          @preview="(url, name) => previewRef.show(url, name)"
+          @preview="(url, name, id) => previewRef.show(url, name, id)"
         />
       </div>
     </div>

@@ -97,7 +97,7 @@
               :format-hint="s.hint"
               @uploaded="$emit('saved')"
               @deleted="$emit('deleted')"
-              @preview="(url, name) => previewRef.show(url, name)"
+              @preview="(url, name, id) => previewRef.show(url, name, id)"
             />
           </div>
         </el-collapse-item>

@@ -40,7 +40,7 @@
             format-hint="支持 PDF / DOCX"
             @uploaded="$emit('saved')"
             @deleted="$emit('deleted')"
-            @preview="(url, name) => previewRef.show(url, name)"
+            @preview="(url, name, id) => previewRef.show(url, name, id)"
           />
         </el-collapse-item>
       </el-collapse>

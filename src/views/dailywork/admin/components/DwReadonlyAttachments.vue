@@ -9,7 +9,7 @@
             <el-icon class="chip-icon"><Document /></el-icon>
             <span class="chip-name" :title="f.fileName">{{ f.fileName }}</span>
             <div class="chip-actions">
-              <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName)">预览</el-button>
+              <el-button v-if="canPreview(f.fileName)" type="primary" link size="small" @click="$emit('preview', f.fileUrl, f.fileName, f.id)">预览</el-button>
               <el-button type="primary" link size="small" @click="downloadFile(f)">下载</el-button>
             </div>
           </div>

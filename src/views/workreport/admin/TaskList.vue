@@ -217,6 +217,7 @@ import { setDwTaskModules } from '@/api/dailywork'
 import { getTemplateList } from '@/api/template'
 import { getUsers } from '@/api/auth'
 import { DW_QUARTER_MODULES, DW_ANNUAL_MODULES } from '@/utils/dwTaskModules'
+import { filterAssignableQcOrgs } from '@/utils/qcOrgAssign'
 
 const loading = ref(false)
 const list = ref([])
@@ -402,16 +403,15 @@ async function openScopeDialog(row) {
   scopeTaskId.value = row.id
   scopeTaskName.value = row.taskName || ''
   scopeKeyword.value = ''
-  if (!userList.value.length) {
-    const res = await getUsers()
-    userList.value = res.data || []
-  }
+  const usersRes = await getUsers()
+  userList.value = filterAssignableQcOrgs(usersRes.data || [])
+  const assignableIdSet = new Set(userList.value.map(u => String(u.orgId)))
   const res = await getTaskScope(row.id)
   const orgsWithStatus = res.data?.orgs || []
   const statusMap = {}
   orgsWithStatus.forEach(o => { statusMap[String(o.orgId)] = o.recordStatus })
   scopeOrgStatusMap.value = statusMap
-  selectedOrgIds.value = [...(res.data?.orgIds || [])]
+  selectedOrgIds.value = [...(res.data?.orgIds || [])].filter(id => assignableIdSet.has(String(id)))
   scopeVisible.value = true
 }
 

@@ -14,7 +14,7 @@
           <el-button
             v-if="canPreview(file.fileName)"
             type="primary" link size="small"
-            @click="$emit('preview', file.fileUrl, file.fileName)"
+            @click="$emit('preview', file.fileUrl, file.fileName, file.id)"
           >预览</el-button>
           <el-button
             type="primary" link size="small"

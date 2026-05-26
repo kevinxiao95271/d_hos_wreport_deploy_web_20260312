@@ -87,7 +87,7 @@
       format-hint="支持 PDF / DOCX / 图片"
       @uploaded="$emit('saved')"
       @deleted="$emit('deleted')"
-      @preview="(url, name) => previewRef.show(url, name)"
+      @preview="(url, name, id) => previewRef.show(url, name, id)"
     />
   </div>
 </template>

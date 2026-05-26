@@ -17,7 +17,7 @@
         :format-hint="singleSlot.hint"
         @uploaded="$emit('uploaded')"
         @deleted="$emit('deleted')"
-        @preview="(url, name) => previewRef.show(url, name)"
+        @preview="(url, name, id) => previewRef.show(url, name, id)"
       />
     </template>
 
@@ -35,7 +35,7 @@
           :format-hint="s.hint"
           @uploaded="$emit('uploaded')"
           @deleted="$emit('deleted')"
-          @preview="(url, name) => previewRef.show(url, name)"
+          @preview="(url, name, id) => previewRef.show(url, name, id)"
         />
       </div>
     </template>
@@ -90,7 +90,7 @@ const SLOT_MAP = {
     type: 'multi',
     recordKey: 'workPlanFiles',
     slots: [
-      { slot: 'plan',    field: 'plan',    label: '年度工作计划（word上传，注意格式）', accept: '.pdf,.docx,.doc' },
+      { slot: 'plan',    field: 'plan',    label: '工作指引', accept: '.pdf,.docx,.doc' },
       { slot: 'summary', field: 'summary', label: '年度工作总结（word上传，注意格式）', accept: '.pdf,.docx,.doc' },
     ],
     extraKey: 'workPlanExtra',
