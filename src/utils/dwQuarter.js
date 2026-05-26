@@ -1,26 +1,50 @@
 /**
- * 会议/培训/指导/调研：按开始时间倒序（与后端约定一致，可作兜底）
- * 规则：开始日期 DESC → 同日 上下午 DESC（PM 在前）→ id DESC
+ * 会议/培训/指导/调研：按活动开始时间从早到晚排序（无开始日期排最后）。
+ * 规则：开始日期 ASC → 同日 上午 → 下午 → 记录 ID
  */
 const START_KEYS = {
   meeting: { date: 'meetingStartDate', half: 'meetingStartHalf' },
   training: { date: 'trainingStartDate', half: 'trainingStartHalf' },
   guidance: { date: 'guidanceStartDate', half: 'guidanceStartHalf' },
   survey: { date: 'surveyStartDate', half: 'surveyStartHalf' },
+  data_analysis_report: { date: 'reportDate', half: null },
 }
 
-export function sortDwSubRecordsByStartDesc(items, moduleKey) {
+function halfOrder(half) {
+  if (!half) return 0
+  const v = String(half).trim()
+  if (v === 'PM' || v === '下午') return 1
+  return 0
+}
+
+/** 可比较的排序键，越大表示时间越晚 */
+function getSubRecordSortKey(item, keyDef) {
+  if (!keyDef) return Number.MAX_SAFE_INTEGER
+  const dateStr = item[keyDef.date]
+  if (!dateStr) return Number.MAX_SAFE_INTEGER
+  const m = String(dateStr).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (!m) return Number.MAX_SAFE_INTEGER
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  const dayNum = y * 10000 + mo * 100 + d
+  const half = keyDef.half ? halfOrder(item[keyDef.half]) : 0
+  return dayNum * 2 + half
+}
+
+export function sortDwSubRecordsByStartTime(items, moduleKey) {
   const k = START_KEYS[moduleKey]
   if (!k || !items?.length) return [...(items || [])]
   return [...items].sort((a, b) => {
-    const da = a[k.date] || ''
-    const db = b[k.date] || ''
-    if (da !== db) return db.localeCompare(da)
-    const ha = a[k.half] === 'PM' ? 1 : 0
-    const hb = b[k.half] === 'PM' ? 1 : 0
-    if (ha !== hb) return hb - ha
-    return String(b.id ?? '').localeCompare(String(a.id ?? ''), undefined, { numeric: true })
+    const diff = getSubRecordSortKey(a, k) - getSubRecordSortKey(b, k)
+    if (diff !== 0) return diff
+    return String(a.id ?? '').localeCompare(String(b.id ?? ''), undefined, { numeric: true })
   })
+}
+
+/** @deprecated 使用 sortDwSubRecordsByStartTime */
+export function sortDwSubRecordsByStartDesc(items, moduleKey) {
+  return sortDwSubRecordsByStartTime(items, moduleKey)
 }
 
 /** Q1-Q4 底色，Q3 统一使用 Q1 的蓝色调 */

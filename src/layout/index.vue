@@ -28,6 +28,10 @@
             <el-icon><Grid /></el-icon>
             <span>数据汇聚</span>
           </el-menu-item>
+          <el-menu-item index="/admin/data-dashboard">
+            <el-icon><Histogram /></el-icon>
+            <span>数据看板</span>
+          </el-menu-item>
           <el-menu-item index="/admin/dw-config">
             <el-icon><Setting /></el-icon>
             <span>日常工作配置</span>

@@ -350,7 +350,7 @@ import DwAttachSlot       from './DwAttachSlot.vue'
 import DwPendingFileList  from './DwPendingFileList.vue'
 import DwExtraFields from './DwExtraFields.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
-import { dwQuarterRowStyle } from '@/utils/dwQuarter'
+import { dwQuarterRowStyle, sortDwSubRecordsByStartTime } from '@/utils/dwQuarter'
 
 const props = defineProps({
   moduleKey:    { type: String, required: true },
@@ -370,7 +370,7 @@ const START_DATE_KEY = {
   guidance: 'guidanceStartDate', survey: 'surveyStartDate',
 }
 
-const displayItems = computed(() => props.items)
+const displayItems = computed(() => sortDwSubRecordsByStartTime(props.items, props.moduleKey))
 
 const previewRef      = ref(null)
 const dialogVisible   = ref(false)

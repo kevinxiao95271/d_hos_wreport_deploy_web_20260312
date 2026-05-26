@@ -66,3 +66,6 @@ export const saveDwModuleScore = (data) => request.post('/dw/record/module/score
 
 /** 年度汇总（管理端传 orgId；机构端不传自动取当前机构） */
 export const getDwYearSummary  = (params) => request.get('/dw/record/year-summary', { params })
+
+/** 数据看板 — 按任务与机构维度统计各模块填报数量 */
+export const getDwDashboardModuleStats = (params) => request.get('/dw/dashboard/module-stats', { params })

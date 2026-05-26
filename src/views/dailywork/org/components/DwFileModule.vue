@@ -75,7 +75,7 @@ const extraLocal = ref({})
 
 // 格式常量
 const FMT = {
-  pdfDocx: { accept: '.pdf,.docx,.doc',           hint: '支持 PDF / DOCX（须加盖公章）' },
+  pdfDocx: { accept: '.pdf,.docx,.doc',           hint: '支持 PDF / DOCX' },
   imgPdf:  { accept: '.jpg,.jpeg,.png,.gif,.pdf',  hint: '支持 JPG / PNG / GIF / PDF' },
 }
 

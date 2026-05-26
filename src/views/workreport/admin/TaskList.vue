@@ -185,7 +185,7 @@
           </div>
           <el-divider style="margin: 8px 0" />
           <el-checkbox-group v-model="selectedOrgIds" class="scope-list">
-            <div v-for="u in filteredUsers" :key="u.userId" class="scope-item">
+            <div v-for="u in filteredUsers" :key="u.orgId" class="scope-item">
               <el-tooltip
                 :content="isOrgLocked(u) ? '请先驳回后再移出' : ''"
                 :disabled="!isOrgLocked(u)"
@@ -404,7 +404,7 @@ async function openScopeDialog(row) {
   scopeKeyword.value = ''
   if (!userList.value.length) {
     const res = await getUsers()
-    userList.value = (res.data || []).filter(u => u.account !== 'wr_admin' && !u.account.startsWith('test'))
+    userList.value = res.data || []
   }
   const res = await getTaskScope(row.id)
   const orgsWithStatus = res.data?.orgs || []

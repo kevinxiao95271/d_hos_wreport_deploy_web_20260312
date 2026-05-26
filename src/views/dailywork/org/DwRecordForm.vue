@@ -230,7 +230,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, initDwRecord, submitDwRecord, saveDwFieldValues } from '@/api/dailywork'
-import { sortDwSubRecordsByStartDesc } from '@/utils/dwQuarter'
+import { sortDwSubRecordsByStartTime } from '@/utils/dwQuarter'
 import { DW_ANNUAL_MODULES, DW_QUARTER_MODULES, DW_ANNUAL_EXCLUDED_MODULES } from '@/utils/dwTaskModules'
 import DwSubList          from './components/DwSubList.vue'
 import DwBonusList        from './components/DwBonusList.vue'
@@ -329,22 +329,17 @@ function isNetworkBuildModule(key) { return key === 'network_build' }
 function isYearReportModule(key) { return key === 'national_report' || key === 'prov_report' }
 
 function getListItems(key) {
-  // 年度自填条目：按开始时间倒序
-  const own = sortDwSubRecordsByStartDesc(
-    (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _fromQuarter: null, _readOnly: false })),
-    key
-  )
-  // 季度快照：保持后端顺序，只读
+  const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _fromQuarter: null, _readOnly: false }))
   const snapshots = detail.value.quarterlySnapshots || []
+  let quarterly = []
   if (snapshots.length) {
-    const quarterly = snapshots.flatMap(snap =>
+    quarterly = snapshots.flatMap(snap =>
       (snap.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({
         ...i, _fromQuarter: snap.statQuarter, _readOnly: true,
       }))
     )
-    return [...own, ...quarterly]
   }
-  return own
+  return sortDwSubRecordsByStartTime([...own, ...quarterly], key)
 }
 
 function getBonusItems(bonusType) {

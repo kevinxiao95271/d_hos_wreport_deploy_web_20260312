@@ -20,7 +20,7 @@
           :slot_="yearSlotKey(year)"
           :editable="editable"
           accept=".pdf,.docx,.doc"
-          format-hint="支持 PDF / DOCX（须加盖公章）"
+          format-hint="支持 PDF / DOCX"
           :label="`${year}年证明材料`"
           @uploaded="$emit('uploaded')"
           @deleted="$emit('deleted')"

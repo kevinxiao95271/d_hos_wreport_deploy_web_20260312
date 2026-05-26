@@ -12,6 +12,7 @@
     "axios": "0.26.1",
     "dayjs": "^1.11.10",
     "docx-preview": "^0.3.7",
+    "echarts": "^6.1.0",
     "element-plus": "2.8.4",
     "pinia": "2.0.13",
     "vue": "3.3.4",

@@ -15,6 +15,7 @@ const routes = [
       { path: '/admin/record-review',   name: 'RecordAdminList',    component: () => import('@/views/workreport/admin/RecordAdminList.vue'),    meta: { title: '上报审阅',   role: 'deptAdmin' } },
       { path: '/admin/record-detail',   name: 'RecordAdminDetail',  component: () => import('@/views/workreport/admin/RecordAdminDetail.vue'),  meta: { title: '上报详情',   role: 'deptAdmin', hidden: true } },
       { path: '/admin/crossview',    name: 'CrossView',      component: () => import('@/views/workreport/admin/CrossView.vue'),      meta: { title: '数据汇聚',   role: 'deptAdmin' } },
+      { path: '/admin/data-dashboard', name: 'DataDashboard', component: () => import('@/views/dashboard/DataDashboard.vue'),       meta: { title: '数据看板',   role: 'deptAdmin' } },
       { path: '/admin/dw-config',   name: 'DwModuleConfig', component: () => import('@/views/dailywork/admin/DwModuleConfig.vue'),  meta: { title: '日常工作配置', role: 'deptAdmin' } },
       { path: '/admin/dw-view',     name: 'DwAdminView',    component: () => import('@/views/dailywork/admin/DwAdminView.vue'),    meta: { title: '日常工作详情', role: 'deptAdmin', hidden: true } },
       { path: '/score/board414',    name: 'ScoreBoard414',  component: () => import('@/views/score/ScoreBoard414.vue'),            meta: { title: '历史得分看板' } },

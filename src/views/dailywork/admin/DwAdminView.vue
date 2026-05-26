@@ -1,6 +1,6 @@
 <template>
-  <div class="dw-admin-view" v-loading="loading">
-    <el-page-header @back="$router.back()" style="margin-bottom:16px">
+  <div class="dw-admin-view" :class="{ 'dw-admin-view--embedded': embedded }" v-loading="loading">
+    <el-page-header v-if="!embedded" @back="$router.back()" style="margin-bottom:16px">
       <template #content>
         <span>日常工作详情</span>
         <el-tag :type="statusType(detail.status)" size="small" style="margin-left:10px">
@@ -9,7 +9,7 @@
       </template>
     </el-page-header>
 
-    <el-descriptions border :column="3" size="small" style="margin-bottom:16px">
+    <el-descriptions v-if="!embedded" border :column="3" size="small" style="margin-bottom:16px">
       <el-descriptions-item label="机构">{{ detail.orgName }}</el-descriptions-item>
       <el-descriptions-item label="任务">{{ detail.taskName }}</el-descriptions-item>
       <el-descriptions-item label="记录ID"><span style="font-family:monospace;font-size:12px">{{ detail.recordId }}</span></el-descriptions-item>
@@ -17,7 +17,7 @@
     </el-descriptions>
 
     <!-- 各模块：大类横幅 + 叶子模块卡片 -->
-    <template v-for="mod in enabledModules" :key="mod.moduleKey">
+    <template v-for="mod in viewModules" :key="mod.moduleKey">
 
       <!-- ══ 一级大类横幅 ══ -->
       <template v-if="mod.isLeaf === false && catHasLeafChildren(mod.moduleKey)">
@@ -77,7 +77,7 @@
         <div v-show="!isCollapsed(mod.moduleKey)">
 
         <!-- 评分行：所有有 scoreMax 的模块均在此处统一打分（季度任务不打分） -->
-        <div v-if="mod.scoreMax != null && !isQuarterlyTask" class="score-input-bar">
+        <div v-if="mod.scoreMax != null && !isQuarterlyTask && !embedded" class="score-input-bar">
           <div class="score-strip score-strip--bar">
             <span class="score-field"><span class="score-field-label">满分</span><span class="score-field-val score-field-val--max">{{ mod.scoreMax }}</span></span>
             <span class="score-field"><span class="score-field-label">自评分</span><span class="score-field-val score-field-val--self">{{ moduleSelfScoreText(mod) }}</span></span>
@@ -260,7 +260,7 @@
     </template><!-- /enabledModules loop -->
 
     <!-- 总分汇总（季度任务不展示） -->
-    <div v-if="!isQuarterlyTask" class="score-summary-bar" style="margin-top:20px">
+    <div v-if="!embedded && !isQuarterlyTask" class="score-summary-bar" style="margin-top:20px">
       <div class="score-summary-title">评分汇总</div>
       <div class="score-summary-cells">
         <div class="score-summary-cell score-summary-cell--max">
@@ -291,7 +291,7 @@
     </div>
 
     <!-- 审核操作（status=1 待审核时显示） -->
-    <el-card v-if="detail.status === 1" shadow="never" style="margin-top:12px">
+    <el-card v-if="!embedded && detail.status === 1" shadow="never" style="margin-top:12px">
       <template #header><span>审核操作</span></template>
       <el-form label-width="90px" style="max-width:500px">
         <el-form-item label="审核意见">
@@ -313,12 +313,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, ArrowDown } from '@element-plus/icons-vue'
 import { getDwModules, getDwRecord, auditDwRecord, saveDwModuleScore } from '@/api/dailywork'
-import { sortDwSubRecordsByStartDesc, dwQuarterRowStyle } from '@/utils/dwQuarter'
+import { sortDwSubRecordsByStartTime, dwQuarterRowStyle } from '@/utils/dwQuarter'
 import { DW_ANNUAL_MODULES, DW_QUARTER_MODULES, DW_ANNUAL_EXCLUDED_MODULES } from '@/utils/dwTaskModules'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import DwReadonlyAttachments from './components/DwReadonlyAttachments.vue'
@@ -326,8 +326,14 @@ import DwReadonlyBonuses     from './components/DwReadonlyBonuses.vue'
 import DwReadonlyFileModule       from './components/DwReadonlyFileModule.vue'
 import DwReadonlyYearReportModule from './components/DwReadonlyYearReportModule.vue'
 
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  focusModuleKey: { type: String, default: '' },
+  recordIdProp: { type: [String, Number], default: '' },
+})
+
 const route    = useRoute()
-const recordId = route.query.recordId
+const recordId = computed(() => String(props.recordIdProp || route.query.recordId || ''))
 const loading  = ref(true)
 const auditing = ref(false)
 const modules  = ref([])
@@ -353,6 +359,21 @@ const enabledModules = computed(() => {
     return all.filter(m => m.isLeaf === false || set.has(m.moduleKey))
   }
   return all
+})
+
+const viewModules = computed(() => {
+  const all = enabledModules.value
+  const focus = props.focusModuleKey || route.query.moduleKey || ''
+  if (!focus) return all
+  const target = all.find(m => m.moduleKey === focus)
+  if (!target) return all.filter(m => m.moduleKey === focus)
+  if (target.isLeaf === false) {
+    return all.filter(m => m.moduleKey === focus || m.parentModuleKey === focus)
+  }
+  if (target.parentModuleKey) {
+    return all.filter(m => m.moduleKey === target.parentModuleKey || m.moduleKey === focus)
+  }
+  return all.filter(m => m.moduleKey === focus)
 })
 
 /** 年度任务：statQuarter=null + taskType=daily_work */
@@ -415,7 +436,7 @@ async function saveModuleScore(mod) {
   savingKey.value = mod.moduleKey
   try {
     await saveDwModuleScore({
-      recordId:    recordId,
+      recordId:    recordId.value,
       moduleKey:   mod.moduleKey,
       subRecordId: null,
       score:       entry.score,
@@ -438,7 +459,7 @@ async function saveSubRecordScore(moduleKey, item) {
   savingSubId.value = String(item.id)
   try {
     await saveDwModuleScore({
-      recordId:    recordId,
+      recordId:    recordId.value,
       moduleKey:   moduleKey,
       subRecordId: String(item.id),
       score:       score,
@@ -511,22 +532,17 @@ function isBonusModule(key) { return key === 'bonus' || key === 'bonus_pub' || k
 function isYearReportModule(key) { return key === 'national_report' || key === 'prov_report' }
 
 function getListItems(key) {
-  // 年度自填条目：按开始时间倒序
-  const own = sortDwSubRecordsByStartDesc(
-    (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _fromQuarter: null, _readOnly: false })),
-    key
-  )
-  // 季度快照：保持后端顺序，只读
+  const own = (detail.value[DETAIL_KEY[key]] || []).map(i => ({ ...i, _fromQuarter: null, _readOnly: false }))
   const snapshots = detail.value.quarterlySnapshots || []
+  let quarterly = []
   if (snapshots.length) {
-    const quarterly = snapshots.flatMap(snap =>
+    quarterly = snapshots.flatMap(snap =>
       (snap.detail?.[DETAIL_KEY[key]] ?? []).map(i => ({
         ...i, _fromQuarter: snap.statQuarter, _readOnly: true,
       }))
     )
-    return [...own, ...quarterly]
   }
-  return own
+  return sortDwSubRecordsByStartTime([...own, ...quarterly], key)
 }
 
 function listItemsSortedForModule(moduleKey) {
@@ -655,9 +671,10 @@ function initSubRecordScores(detailData) {
 }
 
 async function loadAll() {
+  if (!recordId.value) return
   loading.value = true
   try {
-    const [modRes, detailRes] = await Promise.all([getDwModules(), getDwRecord(recordId)])
+    const [modRes, detailRes] = await Promise.all([getDwModules(), getDwRecord(recordId.value)])
     modules.value = modRes.data    || []
     detail.value  = detailRes.data || {}
     initModuleScores(modules.value)
@@ -671,7 +688,7 @@ async function doAudit(result) {
   await ElMessageBox.confirm(confirmMsg, '提示', { type: 'warning' })
   auditing.value = true
   try {
-    await auditDwRecord(recordId, result, auditRemark.value)
+    await auditDwRecord(recordId.value, result, auditRemark.value)
     ElMessage.success(result === 1 ? '已通过' : '已驳回')
     await loadAll()
   } finally { auditing.value = false }
@@ -680,11 +697,14 @@ async function doAudit(result) {
 const statusLabel = s => ({ 0: '草稿', 1: '已提交', 2: '已通过', 3: '已驳回' }[s] ?? '—')
 const statusType  = s => ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }[s] ?? 'info')
 
-onMounted(loadAll)
+watch(recordId, (id) => {
+  if (id) loadAll()
+}, { immediate: true })
 </script>
 
 <style scoped>
 .dw-admin-view { width: 100%; max-width: none; margin: 0; }
+.dw-admin-view--embedded { padding: 0 4px 24px; }
 /* ══════════════════════════════════════
    一级大类横幅（通栏 + 粗色带）
 ══════════════════════════════════════ */
